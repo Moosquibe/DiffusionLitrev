@@ -1,4 +1,4 @@
-# Retro Diffusion - a tour of diffusion models
+# :construction: Retro Diffusion - a tour of diffusion models :construction:
 
 This repo is an ongoing educational journey into diffusion models. The goal is to provide a progressively expanding collection of PyTorch reference implementations of the most important diffusion model milestones. I prefer to keep training and inference runnable locally on a laptop, I will rely more on small popular datasets and occasional synthetic data. Then name implies that by the time I finish, these models will be fairly "retro" (some of them already are).
 
