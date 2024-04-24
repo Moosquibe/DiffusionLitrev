@@ -6,7 +6,17 @@ py_binary(
     name = "train",
     srcs = ["train.py"],
     deps = [
-        "@pypi//torch:pkg"
+        "@pypi//torch:pkg",
+        ":layers"
+    ]
+)
+
+py_library(
+    name = "layers",
+    srcs = ["srcs/modules/multi_scale_convolution.py"],
+    deps = [
+        "@pypi//torch:pkg",
+        "@pypi//numpy:pkg"
     ]
 )
 
