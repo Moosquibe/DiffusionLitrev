@@ -1,1 +1,1 @@
-workspace(name = "RetroDiffusion")
+# Root of the workspace
