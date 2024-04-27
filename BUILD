@@ -1,3 +1,4 @@
+load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@pip//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
@@ -27,3 +28,5 @@ compile_pip_requirements(
     requirements_txt = "requirements.txt",
     requirements_windows = "requirements_windows.txt",
 )
+
+npm_link_all_packages(name = "node_modules")

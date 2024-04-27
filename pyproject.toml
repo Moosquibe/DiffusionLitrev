@@ -12,7 +12,7 @@ sections = ['FUTURE','STDLIB','THIRDPARTY', 'RETRODIFFUSION', 'FIRSTPARTY','LOCA
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
 exclude = '''
 (
   /(
