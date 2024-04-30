@@ -46,22 +46,7 @@ echo
 echo "Linting Python code"
 echo ---------------------
 bazel run -- //tools/flake8 ${REPO_ROOT}
-#echo
-#echo "Doing static type checking"
-#echo ----------------------------
-#bazel run -- //tools/pyright ${REPO_ROOT}
-
-#################
-# Markdown Linting
-#################
 echo
-echo "Linting markdown"
+echo "Doing static type checking"
 echo ----------------------------
-
-MARKDOWN_FILES=$(find ${REPO_ROOT} -type f -name "*.md" -print)
-PRETTIER_ARGS=("--write" "--config ${REPO_ROOT}/.prettierrc")
-PRETTIER_INVOCATION="bazel run -- //tools/prettier ${PRETTIER_ARGS[@]}"
-echo $MARKDOWN_FILES | xargs ${PRETTIER_INVOCATION}
-
-
-printf "\n✨ Linting completed successfully! ✨\n"
+bazel run -- //tools/pyright ${REPO_ROOT}

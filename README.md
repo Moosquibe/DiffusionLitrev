@@ -4,14 +4,17 @@ This repo is an ongoing educational journey into diffusion models. The goal is t
 progressively expanding collection of PyTorch reference implementations of the most important
 diffusion model milestones. I prefer to keep training and inference runnable locally on a laptop, I
 will rely more on small popular datasets and occasional synthetic data. Then name implies that by
-the time I finish, these models will be fairly "retro" (some of them already are).
+the time I finish, these models will be fairly "retro" (some of them already are). I plan to also write
+some survey notes.
 
-I start with the first paper introducing diffusion models in
-_[Deep Unsupervised Learning Using Nonequilibrium Thermodynamics](https://arxiv.org/pdf/1503.03585.pdf)_
-by Sohl-Dickstein, Weiss, Maheswaranathan, Ganguli published back in 2015. There is an
-implementation provided the authors at
-https://github.com/Sohl-Dickstein/Diffusion-Probabilistic-Models but it is about 9 years old written
-using Theano so let's give it a facelift using PyTorch.
+Papers (tentatively) covered:
+
+| Name                                                               | Authors                   | ArXiv Link                                         | Year | Note                                                               |
+|--------------------------------------------------------------------|---------------------------|----------------------------------------------------|------|--------------------------------------------------------------------|
+| "Diffusion Probabilistic Models"                                   | Sohl-Dickstein et al      | [arXiv:1503.03585](https://arxiv.org/pdf/1503.03585) | 2015 | First paper that introduced the idea of diffusion models.         |
+| "Denoising Diffusion Probabilistic Models"                         | Ho et al                  | [arXiv:2006.11239](https://arxiv.org/pdf/2006.11239) | 2020 | Added some crucial modifications of the original architecture.    |
+| "Score-Based Generative Modeling through Stochastic Differential Equations" | Song et al.           | [arxiv:2011.13456](https://arxiv.org/pdf/2011.13456) | 2021 |                                                                    |
+| "Causal Diffusion Autoencoders: Toward Counterfactual Generation via Diffusion Probabilistic Models" | Komanduri et. al | [arxiv:2404.17735](https://arxiv.org/pdf/2404.17735) | 2024 |
 
 ## Install and setup
 

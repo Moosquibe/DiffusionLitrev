@@ -1,3 +1,18 @@
+[project]
+name = "RetroDiffusion"
+version = "0.0.1"
+authors = [
+  { name="Zsolt Pajor-Gyulai", email="pgyzs1@gmail.com" },
+]
+description = "An educational project about diffusion processes."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
 [tool.isort]
 multi_line_output = 3
 include_trailing_comma = true
