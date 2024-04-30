@@ -3,12 +3,12 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 py_binary(
-    name = "train",
-    srcs = ["train.py"],
+    name = "scratch",
+    srcs = ["scratch.py"],
     deps = [
         requirement("torch"),
         requirement("pyright"),
-        ":layers",
+        ":modules",
     ],
 )
 
