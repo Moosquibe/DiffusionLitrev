@@ -4,7 +4,7 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 py_binary(
     name = "scratch",
-    srcs = ["scratch.py"],
+    srcs = ["src/scratch.py"],
     deps = [
         requirement("torch"),
         requirement("pyright"),
