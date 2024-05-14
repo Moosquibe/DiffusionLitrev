@@ -20,7 +20,6 @@ def jupyter_notebook(name, deps = None, data = None):
         srcs = ["jupyterlab.py"],
         args = [
             "--LabApp.default_url={0}/$(location {1}.ipynb)".format(notebook_url_prefix, name),
-            "-h",
         ],
         data = ["{0}.ipynb".format(name)],
         deps = [

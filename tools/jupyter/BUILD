@@ -5,10 +5,19 @@ exports_files([
     "jupyterlab.py",
 ])
 
+py_binary(
+    name = "build_jupyterlab",
+    main = "build.py",
+    srcs = ["build.py"],
+    deps = [
+        requirement("jupyterlab")
+    ]
+)
 
 jupyter_notebook(
     name = "empty_notebook",
     deps = [
+        ":build_jupyterlab",
         requirement("numpy")
     ]
 )
