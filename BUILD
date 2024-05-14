@@ -36,3 +36,8 @@ compile_pip_requirements(
     requirements_txt = "requirements.txt",
     requirements_windows = "requirements_windows.txt",
 )
+
+alias(
+    name="jupyterlab",
+    actual="//tools/jupyter:jupyterlab",
+)

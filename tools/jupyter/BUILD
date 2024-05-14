@@ -1,30 +1,12 @@
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@pip//:requirements.bzl", "requirement")
-load(":rules.bzl", "jupyter_notebook")
-
-exports_files([
-    "jupyterlab.py",
-])
 
 py_binary(
-    name = "build_jupyterlab",
-    main = "build.py",
-    srcs = ["build.py"],
+    name = "jupyterlab",
+    main = "jupyterlab.py",
+    srcs = ["jupyterlab.py"],
     deps = [
-        requirement("jupyterlab")
-    ]
+        requirement("jupyterlab"),
+    ],
+    visibility = ["//visibility:public"],
 )
-
-jupyter_notebook(
-    name = "empty_notebook",
-    deps = [
-        ":build_jupyterlab",
-        requirement("numpy")
-    ]
-)
-
-#py_library(
-#    name = "jupyter_utils"
-#    srcs = [
-#        "jupyter_utils.py"
-#    ]
-#)
