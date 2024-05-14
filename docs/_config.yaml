@@ -1,1 +1,6 @@
-theme: architect
+remote_theme: pages-themes/architect@v0.2.0
+plugins:
+- jekyll-remote-theme 
+
+title: Deep Dive Literature Review of Diffusion Models
+description: Thes pages are attempting to give an overview of the Diffusion Model literature in the past decade or so.
