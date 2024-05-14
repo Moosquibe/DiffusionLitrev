@@ -25,7 +25,15 @@ Here is a long list of papers I plan to cover tentatively. This list will probab
 | "Discrete Diffusion Modeling by Estimating the Ratios of the Data Distribution" | Lou et al. | [arxiv:2310.16834](https://arxiv.org/abs/2310.16834) | 2024 | Diffusion for LLM-s! |
 | "Scaling Rectified Flow Transformers for High-Resolution Image Synthesis" | Esser et. al | [arxiv:2403.03206](https://arxiv.org/pdf/2403.03206) | 2024 | Stable Diffusion 3 |
 
-## Install and setup
+## Usage
+
+To read the main document, see
+
+To run the notebooks
+
+```bash
+bazel run jupyterlab
+```
 
 ### Using Bazel
 
@@ -42,3 +50,5 @@ The result can be validated by
 ```bash
 bazel test requirements_test
 ```
+
+To have access to requirements, add them to the jupyterlab target in `//tools/jupyter/BUILD`.

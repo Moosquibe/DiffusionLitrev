@@ -4,7 +4,7 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 py_binary(
     name = "scratch",
-    srcs = ["scratch.py"],
+    srcs = ["src/scratch.py"],
     deps = [
         requirement("torch"),
         requirement("pyright"),
@@ -35,4 +35,9 @@ compile_pip_requirements(
     src = "requirements.in",
     requirements_txt = "requirements.txt",
     requirements_windows = "requirements_windows.txt",
+)
+
+alias(
+    name="jupyterlab",
+    actual="//tools/jupyter:jupyterlab",
 )

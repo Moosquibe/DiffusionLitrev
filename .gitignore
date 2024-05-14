@@ -164,3 +164,6 @@ bazel-*
 
 # lock files
 *.lock
+
+# Jupyter
+.DS_Store
