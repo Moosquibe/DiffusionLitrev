@@ -5,11 +5,6 @@ import re
 import sys
 
 from jupyterlab.labapp import main
-from jupyterlab.commands import build, AppOptions
-from jupyterlab.coreconfig import CoreConfig
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 def find_jupyterlab_path(runfile_exec: Path) -> str:
     """ 
@@ -29,6 +24,10 @@ def find_jupyterlab_path(runfile_exec: Path) -> str:
     raise RuntimeError("Could not locate the jupyterlab package in runfiles.")
 
 def get_notebook_dir(bwd: Path) -> str:
+    """
+    Infers the notebook directory from any path inside the repo
+    by first finding the workspace root.
+    """
     while not os.path.exists(os.path.join(bwd, 'WORKSPACE')):
         bwd = bwd.parent
 
