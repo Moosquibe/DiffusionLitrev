@@ -1,8 +1,6 @@
-# :construction: Retro Diffusion - a tour of diffusion models :construction:
+# :construction: Interactive Diffusion Literature Review - a tour of diffusion models :construction:
 
-This repo is an ongoing educational journey into diffusion models. The goal is to provide a litreview
-with a progressively expanding collection of PyTorch reference implementations of the most important
-diffusion model milestones. Whenever possible, I prefer to keep training and inference runnable locally on an average modern MacBook, so I will rely more on small popular datasets and occasional synthetic data. Then name implies that by the time I finish, these models will be fairly "retro" (some of them already are). I plan to also write some survey notes.
+This repo is an ongoing educational journey into diffusion models. The goal is to provide a litreview with a progressively expanding collection of PyTorch reference implementations of the most important diffusion model milestones. Whenever possible, I prefer to keep training and inference runnable locally on an average modern MacBook, so I will rely more on small popular datasets and occasional synthetic data. Then name implies that by the time I finish, these models will be fairly "retro" (some of them already are). I plan to also write some survey notes.
 
 Here is a long list of papers I plan to cover tentatively. This list will probably be categorized or somewhat pruned. No promises.
 
