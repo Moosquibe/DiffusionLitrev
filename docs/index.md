@@ -61,7 +61,7 @@ Note that $\sigma^2=1$ is actually an exact stationary variance, in fact, the on
 
 #### Convergence to Gaussian stationary distribution
 
-To take this further, let us borrow the notation from Ho et al (2020):
+To take this further, let us borrow the notation from [Ho et al (2020)](https://arxiv.org/pdf/2006.11239):
 
 $$ \alpha_t = 1-\beta_t,\qquad \bar{\alpha}_t = \prod_{s=1}^t \alpha_s $$
 
@@ -73,13 +73,13 @@ where $\bar{\varepsilon}_t$ are still isotropic standard Gaussians, but they are
 
 So what is the distribution of $\bf{x}_t$? Clearly, for fixed $\bf{x}_0$ it is a Gaussian, but recall that our starting point is that $\bf{x}_0$ comes from some distribution $q(x_0)$ we are trying to learn and that is far from Gaussian. Taking that into account (which corresponds to sampling an example from $q$ followed by running the Markov chain), $\bf{x}_t$ is an intractable mixture of Gaussians with mixing distribution $q(x_0)$. For large $t$, however, as long as $\bar{\alpha}_t\to 0$ (which translates to $\beta_t$ is not being too small), we have $\bf{x_t} \approx \bar{\varepsilon}_t \sim \mathcal{N}(0, I)$.  This fact can be made rigorous e.g. by using [characteristic functions](https://en.wikipedia.org/wiki/Characteristic_function_(probability_theory)), and is the special case of a more general result on the ergodicity of Markov chains. Furthermore, if $\beta_t > c > 0$ for some number $c$, then $\bar{\alpha}_t\leq (1-c)^t$ and the convergence is exponentially fast.
 
-To summarize, the Markov chain morphs the initial intractable distribution $q(x_0)$ to an approximately Gaussian one $q(x_T)$ which we can very easily handle analytically and sample from. The question is now whether we can learn from this process about how to go the other way and transform a standard isotropic Gaussian distribution to an approximation $p(x_0)$ of $q(x_0)$. Success on this task would mean that we have a way to approximately evaluate $q(x_0)$ and sample from it by simply sampling from a Gaussian.
+To summarize, the Markov chain morphs the initial intractable distribution $q(x_0)$ to an approximately Gaussian one $q(x_T)$ which we can very easily handle analytically and sample from. This convergence of distributions happens faster with larger $\beta$-s. The question is now whether we can learn from this process about how to go the other way and transform a standard isotropic Gaussian distribution to an approximation $p(x_0)$ of $q(x_0)$. Success on this task would mean that we have a way to approximately evaluate $q(x_0)$ and sample from it by simply sampling from a Gaussian.
 
 ### (b) The backward process
 
-### The optimization objective
+### (c) The optimization objective
 
-### The step-size schedule
+### (d) The step-size schedule
 
 
 
