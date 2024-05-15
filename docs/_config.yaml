@@ -1,6 +1,6 @@
 title: Deep Dive Literature Review of Diffusion Models
 description: Thes pages are attempting to give an overview of the Diffusion Model literature in the past decade or so.
-show_downloads: true
+show_downloads: false
 google_analytics:
 theme: jekyll-theme-architect
 
