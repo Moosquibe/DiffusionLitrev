@@ -51,7 +51,7 @@ Now we only need to learn $p(x_i)$ and sample from it, there are several mainstr
 
 - **Flow models**, [...]
 
-- **Diffusion models**, the subject of this piece, that are similar to VAEs, however, their latent variable is the path of a diffusion process and the encoder part is usually not or minimally trained.
+- **Diffusion models**, the subject of this piece, that are similar to VAEs, however, their latent variable is the path of a diffusion process and the prior latent distribution is both learnable and tractable.
 
 ## III. Unconditioned generation with Diffusions
 
@@ -97,36 +97,52 @@ So what is the distribution of $\bf{x}_t$? Clearly, for fixed $\bf{x}_0$ it is a
 
 To summarize, the Markov chain morphs the initial intractable distribution $q(x_0)$ to an approximately Gaussian $q(x_T)$ which we can very easily handle analytically and sample from. This convergence of distributions happens faster with larger $\beta$-s. The question is now whether we can learn from this process about how to go the other way and transform a standard isotropic Gaussian distribution to an approximation $p(x_0)$ of $q(x_0)$.
 
-### (b) The parametrized backward process and the model probability
+### (b) The backward process and the model probability
 
-What we are looking for is a Markov chain that starts at an isotropic Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ and proceeds according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ to eventually arrive at
+It will be helfpul to think in analogy with VAE-s where the diffusion trajectory $z = x_{1:T}$ is for all intents and purposes a complex hidden variable. Then $q(x_{1:T} | x_0)$ plays the role of the encoder and we are looking to learn a decoder $p_{\theta}(x_0|x_{1:T})$. In what follows, we will use the VAE analogy often. Note, however, that it is not a perfect one as we do not have an explicit, fixed prior for the full latent $z$ only for $p(x_T)$. On the other hand, this is exactly what allows for a complex, but still tractable full prior $p_\theta(x_{1:T})$.
 
-$$ p_\theta(x_0) = \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T} $$
+We are going to look for this full prior and the decoded probability in the form of a Markov process working backwards on the diffusion trajectory. In particular, we start with a Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ at time $T$ and proceed backward according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ that we will learn. Eventually, we arrive at the model probability
 
-which we call the *model probability*. To point out the connection with VAE-s, note that the trajectory $z = x_{1:T}$ is a latent variable for the model and the above equation amounts to the usual $p(x_0) = \int p(x_0, z)dz$. This integral is usually intractable and requires importance sampling $z$ according to some proposal distribution for $z$ that emphasizes plausible latent values. In our case, this proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
+$$ p_\theta(x_0) = \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
+
+In the VAE language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$.
+
+As a result, this integral is usually highly intractable but the VAE analogy guides us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
 
 $$
-p(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{q,x_0}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
+p(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
 $$
-which we can evaluate by simple Monte-Carlo by sampling from the forward process.
 
-### (c) The loss
+which we can evaluate by simple Monte-Carlo by sampling by simulating the forward process. We are, however, not done yet, we haven't even use the fact that the model probability $p(x_0)$ should resemble the data distribution $q(x_0)$.
 
-The goal is that $p_{\theta}(x_0)$ should approximate $q(x_0)$ in KL-divergence which we have seen to be equivalent to minimizing their cross-entropy $CE(q, p_{\theta})$:
+### (c) The learning objective
 
-$$ 
+Again, just as in VAE-s, we would like $p_{\theta}(x_0)$ to approximate $q(x_0)$ in KL-divergence which we have seen to be equivalent to minimizing their cross-entropy $CE(q, p_{\theta})$:
+
+$$
 \begin{align*}
--\int q(x_0)\log p_\theta(x_0)dx_0 = - \mathbb{E}_q\log p_{\theta}(x_0) = -\mathbb{E}_q\log \mathbb{E}_{q,x_0}\left[p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}\right]
+-\int q(x_0)\log p_\theta(x_0)dx_0 = - \mathbb{E}_q\log p_{\theta}(x_0) = -\mathbb{E}_q\log \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}\left[p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}\right]
 \end{align*}
 $$
 
-One could naively, plug in here the Monte-Carlo estimate for the inner expectation, however, that would not be an unbiased estimator of $\log p_{\theta}(x_0)$ due to the concavity of the $\log$. Instead, we use Jensen's inequality to swap the logarithm and the inner expectation and obtain the usual *evidence lower bound (ELBO)*:
+where the inner expectation is over the diffusion trajectories with fixed $x_0$ while the outer expectation is over $x_0$. If we wanted to naively evaluate this, we could sample $x_0$ from our datase, simulate $x_{1:T}$ from $q$ for each sample, and use Monte-Carlo to turn the expectation over averages. The problem is that this would be a potentially heavily biased estimator due to the presence of the logarithm (try computing the mean of the estimator, you will get stuck at $\mathbb{E}\log\sum_{samples}$).  
+
+Instead, the VAE recipe suggests we use Jensen's inequality to swap the logarithm and the inner expectation and obtain the usual *evidence lower bound (ELBO)* ("lower" refers to the viewpoint of maximizing the likelihood where there are no minus signs and the inequality is flipped):
 
 $$
--\int q(x_0)\log p_\theta(x_0)dx_0 \leq -\mathbb{E}_q\log \left[p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}\right]
+-\int q(x_0)\log p_\theta(x_0)dx_0 \leq -\mathbb{E}_q\log \left[p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}\right] =: L
 $$
 
-with equality if and only if the term under the log is the same for all trajectories in the support of $q$. This condition implies $q(x_{1:T})=p_\theta(x_{1:T}|x_0)$, that is when the distribution of the forward trajectory is exactly the posterior of $x_{1:T}$ under $p_{\theta}$ given $x_0$. In VAE-s, we jointly optimize both the latent distribution and the "readout" probability $p(x_0|z)$ in order to close the Jensen gap in the bound. In our situation, however, the distribution of the forward process is fairly rigidly prescribed with the $\beta_t$-s being the only (potentially) learnable variational parameters. We remark that in the VAE analogy, $p(x_0|x_{1:T})$ plays the role of the decoder while $q(x_{1:T} | x_0)$ is the encoder.
+where the expectation is now taken over the full trajectory $x_{0:T}$. 
+Since Jensens was only applied to the inner expectation, equality here holds if and only if the term under the log is the same for all trajectories $x_{1:T}$ which implies $q(x_{1:T}|x_0)\sim p_\theta(x_{1:T}, x_0)$. After normalization, this translates to $q(x_{1:T}|x_0) = p_\theta(x_{1:T}| x_0)$ that is when the distribution of the forward trajectory is exactly the posterior of $x_{1:T}$ under $p_{\theta}$ given $x_0$.
+
+This exact posterior is, of course, no easier to compute than the model probability itself, and VAEs try to jointly optimize the encoder $q(z|x)$ and the decoder $p(x|z)$ to simultaneously close the Jensen-gap and the optimize the bound. In our situation, however, the distribution of the forward process is fairly rigidly prescribed with the $\beta_t$-s being the only (potentially) learnable *variational parameters*. The hope is that the trainable full prior will bring us closer to this fixed $q$ instead.
+
+At this point one could provide the parametrization for $p_{\theta}$, evaluate with Monte-Carlo, take gradients and train as usual. This sampling, however is fairly expensive and it turns out we can do better. Let us first separate the edge terms $t = 0$ and $t=T$ in $L$: 
+
+$$
+L = -\mathrm{E}_q\log p(x_T) -\sum_{t=2}^T\mathrm{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1})} - \mathbb{E}_q\log\frac{p_\theta(x_0 | x_1)}{q(x_1|x_0)}
+$$
 
 
 ## Conditioned generation
