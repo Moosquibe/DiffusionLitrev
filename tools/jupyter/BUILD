@@ -7,6 +7,12 @@ py_binary(
     srcs = ["jupyterlab.py"],
     deps = [
         requirement("jupyterlab"),
+        requirement("matplotlib"),
+        requirement("numpy"),
+        requirement("seaborn"),
+        requirement("torch"),
+        requirement("torchvision"),
+        requirement("tqdm")
     ],
     visibility = ["//visibility:public"],
 )
