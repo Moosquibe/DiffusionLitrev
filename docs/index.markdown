@@ -97,17 +97,17 @@ So what is the distribution of $\bf{x}_t$? Clearly, for fixed $\bf{x}_0$ it is a
 
 To summarize, the Markov chain morphs the initial intractable distribution $q(x_0)$ to an approximately Gaussian $q(x_T)$ which we can very easily handle analytically and sample from. This convergence of distributions happens faster with larger $\beta$-s. The question is now whether we can learn from this process about how to go the other way and transform a standard isotropic Gaussian distribution to an approximation $p(x_0)$ of $q(x_0)$.
 
-### (b) The backward process and the model probability
+### (b) The backward process
 
-It will be helfpul to think in analogy with VAE-s where the diffusion trajectory $z = x_{1:T}$ is for all intents and purposes a complex hidden variable. Then $q(x_{1:T} | x_0)$ plays the role of the encoder and we are looking to learn a decoder $p_{\theta}(x_0|x_{1:T})$. In what follows, we will use the VAE analogy often. Note, however, that it is not a perfect one as we do not have an explicit, fixed prior for the full latent $z$ only for $p(x_T)$. On the other hand, this is exactly what allows for a complex, but still tractable full prior $p_\theta(x_{1:T})$.
+#### **The model probability**
 
-We are going to look for this full prior and the decoded probability in the form of a Markov process working backwards on the diffusion trajectory. In particular, we start with a Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ at time $T$ and proceed backward according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ that we will learn. Eventually, we arrive at the model probability
+It will be helfpul to think in analogy with VAE-s where the diffusion trajectory $z = x_{1:T}$ is for all intents and purposes a complex hidden variable. Then $q(x_{1:T} | x_0)$ plays the role of the encoder and we are looking to learn both the full prior latent distribution $p_\theta(x_{1:T})$ and the decoder $p_{\theta}(x_0|x_{1:T}). In what follows, we will use the VAE analogy often. The full prior distribution of the latent is obtained by takinga fixed $p(x_T)$ to be an isotropic standard multivariate Gaussian and using a learned Markov process working backwards on trajectory. In particular, we start with a Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ at time $T$ and proceed backward according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ that we will learn. With this, the decoder becomes $p_{\theta}(x_0|x_{1:T})= p_{\theta}(x_0|x_1)$.
+
+The model probability can then be computed as
 
 $$ p_\theta(x_0) = \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
 
-In the VAE language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$.
-
-As a result, this integral is usually highly intractable but the VAE analogy guides us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
+In the VAE language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this integral is usually highly intractable but the VAE analogy guides us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
 
 $$
 p(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
@@ -115,7 +115,7 @@ $$
 
 which we can evaluate by simple Monte-Carlo by sampling by simulating the forward process. We are, however, not done yet, we haven't even use the fact that the model probability $p(x_0)$ should resemble the data distribution $q(x_0)$.
 
-### (c) The learning objective
+### **The learning objective**
 
 Again, just as in VAE-s, we would like $p_{\theta}(x_0)$ to approximate $q(x_0)$ in KL-divergence which we have seen to be equivalent to minimizing their cross-entropy $CE(q, p_{\theta})$:
 
@@ -138,11 +138,169 @@ Since Jensens was only applied to the inner expectation, equality here holds if 
 
 This exact posterior is, of course, no easier to compute than the model probability itself, and VAEs try to jointly optimize the encoder $q(z|x)$ and the decoder $p(x|z)$ to simultaneously close the Jensen-gap and the optimize the bound. In our situation, however, the distribution of the forward process is fairly rigidly prescribed with the $\beta_t$-s being the only (potentially) learnable *variational parameters*. The hope is that the trainable full prior will bring us closer to this fixed $q$ instead.
 
-At this point one could provide the parametrization for $p_{\theta}$, evaluate with Monte-Carlo, take gradients and train as usual. This sampling, however is fairly expensive and it turns out we can do better. Let us first separate the edge terms $t = 0$ and $t=T$ in $L$: 
+At this point one could provide the parametrization for $p_{\theta}$, evaluate with Monte-Carlo, take gradients and train as usual. This sampling, however is fairly expensive and it turns out we can do better. Let us first separate the edge terms at $t = 0$ and $t=T$ in $L$:
 
 $$
 L = -\mathrm{E}_q\log p(x_T) -\sum_{t=2}^T\mathrm{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1})} - \mathbb{E}_q\log\frac{p_\theta(x_0 | x_1)}{q(x_1|x_0)}
 $$
+
+Note that the only possible learnable parameters in the first term (which is a cross-entropy between $q(x_T|x_0)$ and $p(x_T)$) are the $\beta_t$-s. On the other end, [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) eliminates the last term by pinning $p_\theta(x_0 | x_1)$ to equal the reverse of $q(x_1|x_0)$ under the stationary distribution of the forward process (which is an isotropic Gaussian):
+
+$$
+p_\theta(x_0 | x_1) = q(x_1|x_0)\frac{\pi(x_0)}{\pi(x_1)}.
+$$
+
+This is however a somewhat arbitrary choice as the forward chain is definitely not in stationary state at the start unless $q(x_0)=\pi(x_0)$ which never happens. Therefore, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) decided to learn $p_{\theta}(x_0|x_1)$ separately.
+
+The key element though is what we do with the terms in the middle sum and what parametric form should $p_\theta$ have. First note that these terms are almost KL-divergences but not quite because the probabilities in the numerator and the denumerator are over different variables. To rectify this, we should reverse the $q(x_t| x_{t-1})$ term using Bayes's theorem:
+
+$$
+q(x_t|x_{t-1})=q(x_{t-1} | x_t) \frac{q(x_{t-1})}{q(x_{t})}
+$$
+
+Note, however, that the way to compute this is to condition on $x_0$ and integrate over the intermediate variables. Since $q(x_0)$ is a very complicated distribution, the result will not be Gaussian and we would have to sample from the training set at best. Instead, a very neat trick is to use the Markov property to realize $q(x_t|x_{t-1}) = q(x_t|x_{t-1}, x_0)$ and then apply Bayes theorem to this conditioned version,
+
+$$ q(x_t|x_{t-1}) = q(x_{t-1} | x_t, x_0) \frac{q(x_t|x_0)}{q(x_{t-1}|x_0)}. $$
+
+The gain is that now everything is Gaussian, which is by definition for everything but $q(x_{t-1}|x_t, x_0)$ which is then Gaussian by the virtue of this equation. Plugging this back into the middle term in $L$ we get
+
+$$ \mathbb{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1})} = \mathbb{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)} + \mathbb{E}_q \log\frac{q(x_{t-1}|x_0)}{q(x_{t}|x_0)}, $$
+
+where from the second term, only the denominarot for $t=T$ and the numeratorfor $t=2$ survive the subsequent summation. This leads to
+
+$$
+\begin{align*}
+L = &-\mathbb{E}_q\log \frac{p(x_T)}{q(x_T|x_0)} - \sum_{t=2}^T\mathbb{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)} - \mathbb{E}_q\log p_\theta(x_0|x_1)=\\
+&~ \mathbb{E}_qD_{KL}(q(x_T|x_0)\|p(x_T)) + \sum_{t=2}^T \mathbb{E}_qD_{KL}(q(x_{t-1}|x_t, x_0)\| p_{\theta}(x_{t-1}|x_t)) + \mathbb{E}_qCE(p_{\theta}(x_0|x_1)|| q(x_0, x_1) ) = \\
+&~ L_T + \sum_{t=1}^{T-1} L_t + L_0
+\end{align*}
+$$
+
+$L_T$ is the KL-divergence between two Gaussians and. Note that $q(x_T|x_0)$ will not be perfectly an isotropic Gaussian other than the trivial case when $\beta_t = 1$ for some $t$ and just like with VAE-s, we sample the latent somewhat differently upon training and inference/sampling (but this term is trying to keep them close). If the $\beta_t$-s are not trainable then this term has no trainable component and can be dropped.
+
+#### **The parametrization of the backwards model**
+
+To optimize $L_t$, note that it is the KL-divergence between a Gaussian variable and $p_{\theta}(x_{t-1}| x_t)$. This suggests choosing $p_{\theta}$ to be a Gaussian with parametrizable mean and variance:
+
+$$ p_\theta(x_{t-1}|x_t) = \mathcal{N}(x_{t-1}, \mu_{\theta}(x_t, t), \Sigma_{\theta}(x_t, t)) \qquad 1<t\leq T.$$
+
+This is particularly nice, because the KL-divergence between two Gaussians can be computed in closed form in terms of their parameters. All we need for that then is to compute said parameters of $q(x_{t-1}|x_t, x_0)$:
+
+$$
+\begin{align*}
+-2\log q(x_{t-1}|x_t, x_0) =& -2\log q(x_t|x_{t-1}, x_0) - 2\log q(x_{t-1}|x_0) + 2\log q(x_t|x_0) = \\
+& C(x_0, x_t) + \frac{(x_t - \sqrt{\alpha_t} x_{t-1})^2}{\beta_t} + \frac{(x_{t-1}-\sqrt{\bar{\alpha}}_tx_0)^2}{1-\bar{\alpha}_t} = \\
+& C(x_0, x_t) + \left(\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar{\alpha}_t}\right)x_{t-1}^2 - 2\left(\frac{\sqrt{\alpha_t}}{\beta_t}x_t + \frac{\bar{\alpha}_t}{1-\bar{\alpha_t}}x_0\right)x_{t-1} = \\
+& C(x_0, x_t) + \tilde\beta^{-1}(x_{t-1} - \tilde\mu(x_t, x_0))^2
+\end{align*}
+$$
+where $C(x_0, x_t)$ denotes a quantity (possibly different each line) that only depends on $x_0$ and $x_t$ but not on $x_{t-1}$ and
+$$
+\tilde\beta_t = \left(\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar{\alpha}_t}\right)^{-1} = \frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}\beta_t
+$$
+$$
+\tilde\mu(x_t, x_0) = \tilde\beta_t\left(\frac{\sqrt{\alpha_t}}{\beta_t}x_t + \frac{\bar{\alpha}_t}{1-\bar{\alpha_t}}x_0\right) = \frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}x_t + \frac{\sqrt{\bar\alpha_{t-1}}\beta_t}{1-\bar\alpha_t}x_0.
+$$
+In the formula for the mean, we can eliminate $x_0$ by utilizing the representation $x_t = \sqrt{\bar{\alpha}_t}x_0 + \sqrt{1-\bar\alpha_t}\bar\varepsilon_t$ to get
+
+$$\tilde\mu(x_t, x_0) = \tilde\mu(x_t, \bar\varepsilon_t) =  \frac{1}{\sqrt{\alpha_t}}\left(x_t -\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\bar\varepsilon_t\right)$$
+
+#### **The final form of the objective**
+
+This means that $q(x_{t-1}|x_t, x_0) = \mathcal{N}(x_{t-1}; \tilde\mu(x_t, \bar\varepsilon_t), \tilde{\beta} I)$ and one can use the well known formula
+
+$$ D_{KL}(\mathcal{N}_1, \mathcal{N}_2) = \frac{1}{2}\left[\mathrm{Tr}(\Sigma_2^{-1}\Sigma_1) - k + (\mu_2 -\mu_1)\Sigma_2^{-1}(\mu_2 -\mu_1) + \log\frac{\mathrm{det}\Sigma_1}{\mathrm{det}\Sigma_2}\right]$$
+
+where $k$ is the dimension of $x_\cdot$ to arrive at
+
+$$ L_t = \frac{1}{2}\left[\tilde{\beta}_t\mathrm{Tr}\Sigma^{-1}_\theta(x_t, t) -k + (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0))^T\Sigma_\theta^{-1}(x_t, t) (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0)) + k\log\tilde\beta_t - \log\det\Sigma_{\theta}(x_t, t)\right]. $$
+
+Since the covariance matrix of the forward transition is diagonal, it is reasonable to postulate $\Sigma_\theta(x_t, t) = diag(\Sigma_{\theta}^{ii}(x_t, t))$, which simplifies this formula to a sum of one dimensional KL-divergences
+
+$$ L_t = \frac{1}{2}\mathbb{E}_{x_0, x_t \sim q}\sum_i\left[ \frac{\tilde{\beta}_t + (\mu_{\theta}^i(x_t, t)-\tilde\mu^i(x_t, x_0))^2}{\Sigma_{\theta}^{ii}(x_t, t)} - \sum_i\log\Sigma_{\theta}^{ii}(x_t, t) - 1\right] + \frac{k(\log\tilde\beta_t -1)}{2}$$
+
+This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively ends it. They set $(\mu_{\theta}(x_t, t), \sigma_{\theta}(x_t, t))$ to be a Neural Network (see below for architectures) and also learn $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, we end up with 
+
+$$ L_t = \frac{1}{2\sigma_t^2}\mathbb{E}_{x_0, \bar\varepsilon_t}\|\tilde\mu(x_t, \bar\varepsilon_t) - \mu_{\theta}(x_t, t)\|^2 $$
+
+that we could directly optimize, however, we can go even further using the definition of $\tilde\mu(x_t,\bar\varepsilon_t)$. To see this first rewrite the predicted mean as
+
+$$
+\mu_{\theta}(x_t, t) = \frac{1}{\sqrt{\alpha}_t}\left(x_t-\frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\varepsilon_{\theta}(x_t, t)\right).
+$$
+
+Note that this is the definition of $\varepsilon_\theta$ so that it matches the formula we have for $\tilde\mu$. With this, $L_t$ above becomes
+$$
+L_t = \frac{(1-\alpha_t)^2}{2\alpha_t(1-\bar\alpha_t)\sigma_t^2}\mathbb{E}_{x_0, \bar\varepsilon_t}\|\bar\varepsilon_t - \epsilon_{\theta}(x_t,t)\|^2 = \frac{(1-\alpha_t)^2}{2\alpha_t(1-\bar\alpha_t)\sigma_t^2}\mathbb{E}_{x_0, \bar\varepsilon_t}\|\bar\varepsilon_t - \epsilon_{\theta}(\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\bar\varepsilon_t,t)\|^2
+$$
+
+Other than the weighting factor before the expectation, this says that we want to train a network $\varepsilon_\theta$ that takes in a noisy image and an index of what stage of the denoising we are in and predicts the noise that was added to the original image. We mention that [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) reported better training result by dropping the time dependent pre-factor. This corresponds to the ELBO bound being replaced by a weighted version that emphasizes loss terms corresponding to larger $t$, the authors speculate that this helps because the amount of noise injected is smaller in the early steps so denoising these is an easier task that we do not need to enforce as strong.
+
+#### **The decoder**
+
+As we mentioned, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) derives a discrete decoder $p_{\theta}(x_0|x_1)$ to obtain valid images assuming that all image data consists of integers in ${0, 1, \dots, 255}$ linearly scaled to $[-1, 1]$.
+
+$$
+p_{\theta}(x_0|x_1) = \prod_{i=1}^D\int_{\delta_-(x_0^i)}^{\delta_+(x_0^i)} \mathcal{N}(x; \mu_{\theta}^i(x_1, 1), \sigma_1^2)dx
+$$
+
+$$
+\delta_{\pm}(x) = \left\{\begin{array}{cc}
+\pm\infty&\textrm{if}~x = \pm 1\\
+x\pm\frac{1}{255}&\textrm{if}~\pm x < 1
+\end{array} \right.
+$$
+The effect of this is simply to discretize the probability mass to multiples of $1/255$ corresponding to actual images.
+
+#### **Summary**
+
+This was a lot, let us recap. Diffusion models are latent variable models, where the latent variable is given by the trajectory of a backwards Markov Chain $z = x_{T:1}$. Unlike VAE-s, only the distribution of $x_T$ is specified by hand to be an isotropic Gaussian, the rest of the distribution come from a learnable Markov process. To learn this chain by the negative log-likelihood, we do importance sampling with the proposal distribution given by a very simple and tracktable Markov chain starting from $x_0$ and use the ELBO inequality to obtain a tracktable optimization objective. This bound then decomposes into boundary terms $L_T$, $L_0$ and internal terms $L_1,\dots, L_{T-1}$. The internal terms are all KL-divergences between the posterior of the forward transition and the backward transition. If the learnable model has Gaussian transitions, then we can explicitly write this KL-divergence down in terms of the means and variances (after assuming a diagonal covariance structure). If the covariances are isotropic, this will imply an $L^2$ loss on the predicted mean, what's more, suprisingly, we can take this even further when the learning problem becomes learning the noise in the noisy image under $L^2$ loss.
+
+### (d) Training, Inference, Sampling
+
+#### **Training**
+
+Note that we share the neural network $\varepsilon_\theta, it is sufficient for each training step to sample a single timestep. The training loop thus consists of the following steps:
+
+1. Choose a random element $x_0$ of the training set and sample an integer $t$ uniformly between $1$ and $T$.
+2. Sample $\varepsilon\sim \mathcal{N}(0,I)$.
+3. Take gradient descent step on $\nabla_\theta \|\varepsilon - \varepsilon_\theta(\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\varepsilon)\|$.
+
+#### **Inference**
+
+To evaluate the model probability of an unseen example, I believe we still have to do Monte-Carlo sampling to approximate
+
+$$ p(x_0) = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}. $$
+
+and is consequently fairly expensive consisting of the generation of $B$ trajectories and have $B*T$ neural network plus functions-on-top evaluations.
+
+1. Generate $B$ simulated trajectories from the forward process.
+2. For each $b = 1,...,B$, and each $t\in 1, \dots T$, evaluate
+
+    (a) $\hat\varepsilon_t^{(B)} = \varepsilon_\theta(x_t^{(B)}, t)$
+
+    (b) transform it into $\hat{\mu}_t^{(B)}=\mu_\theta(x_t^{(B)}, \hat \varepsilon_t^{(B)})$
+
+    (c) evaluate $p_{\theta}(x_{t-1}^{(B)}|x_t^{(B)})=\mathcal{N}(x_{t-1}^{(B)}; \hat{\mu}_t^{(B)}, \sigma_t^2 I)$ using the Gaussian pdf.
+3. For each $b = 1, ..., B$, compute $p_B(x_0) by evaluating Gaussians to get the rest of the integrand. The final step involves the discretization step.
+4. Output $p(x_0) = \frac{1}{B}\sum_{b=1}^Bp_B(x_0)$
+
+#### **Sampling**
+
+Sampling is ever so slightly simpler as we only need to go through a single backwards pass and have only $T$ neural network plus functions-on-top evaluations.
+
+1. Generate $x_T\sim\mathcal{N}(0, I)$.
+2. For each $t = T,\dots, 2$, sample $z\sim\mathcal{N}(0, I)$ and update
+
+$$ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\varepsilon_{\theta}(x_t, t)\right) + \sigma_t z $$
+
+3. Output $\mu_{\theta}(x_1, 1)$.
+
+
+
+
+
+
 
 
 ## Conditioned generation
