@@ -7,23 +7,51 @@ layout: home
 
 ## I. Introduction
 
-Generative AI is the closest we have to pure magic. Large Language Models (LLM) can now seamlessly chat with us, while other models create songs, images, and more recently even videos from a single text prompt. Motivated by my selfish desire to demystify the magic behind, this survey focuses on a group of models mostly utilized for the latter task, called Diffusion Models.
+Generative AI is about how we can conjure different media from our imagination and a little noise and is thus the closest thing we have to magic. Large Language Models (LLM) can now seamlessly chat with us, while other models create songs, images, or even videos from a single text prompt. Motivated by the desire to peek behind the curtain and demystify the magic behind modern generative AI, this survey focuses on a group of models giving the state of the art in image and video sythesis called Diffusion Models.
 
-My main motivation here is somewhat selfish. As I set out to learn, understand, and demystify the magic, I found that while there are some excellent resources (beyond the original papers) blog posts (see e.g. ), videos, etc, there were some details never properly explained and implementations I found were often hard to access. In addition, I know it from my academic past that you rarely learn something as well as when you teach it for the first time.
+As mentioned, my main motivation here is to teach myself how the sausage is made, you rarely learn something as well as when you teach it for the first time. While there is no shortage of often excellent self-teach resources, including the original papers, blog posts YouTube videos, etc, I found that some details are not properly explained anywhere, implementations are often hard to access and holistic overviews are rare.
 
 ## II. Generative AI
 
 In abstract form, the task of Generative AI can be phrased deceptively simply:
 
-> Given a highly complex distribution $q(x)$ that lives in a high dimensional ambient space but expected to be concentrated on a much lower dimensional, structured, yet intractable manifold, can we learn the structure of this distribution from a possibly large but nevertheless finite set of examples and produce a reasonable approximation $p(x)$.
+> Given a highly complex, high dimensional distribution $q(x)$ can we learn the structure of this distribution from a possibly large but nevertheless finite set of examples and produce a reasonable approximation $p(x)\approx q(x)$.
 
 For some typical example domains, a second of standard sample rate (44.1kHz) audio can be described by an amplitude vector $x\in\mathbb{R}^{44100}$. A 12 Megapixel RGB image taken by a modern iPhone is representing by an intensity vector in $\mathbb{R}^{3\times 4000\times 3000}$ which uses 36M dimensions. A second of 4K RGB video at 60Hz refresh rate lives in $\mathbb{R}^{3\times 3840\times 2160\times 60}$ which is a ~1.5B dimensional space.
 
-It is not hard to imagine that the overwhelming majority of points in these spaces correspond to absolute jibberish and the meaningful media content lies on a vastly lower dimensional submanifold, the famous manifold hypothesis. We can hardly hope to be able to characterize this submanifold exactly, let alone tractably describe probability distributions over them, however, we can reasonably hope that ML models can learn them with lot less impediment from the curse of dimensionality than the ambient dimension would suggest.
+It is not hard to imagine that the overwhelming majority of points in these spaces correspond to jibberish and the meaningful media content lies on a vastly lower dimensional submanifold. This is the famous *manifold hypothesis*. We can hardly hope to be able to characterize this submanifold exactly, let alone tractably describe probability distributions over them, however, we can reasonably hope that ML models can learn them with lot less impediment from the curse of dimensionality than the ambient dimension would suggest.
 
-Once we learn the distribution $p(x)$ can then use this learned distribution to (1) sample new (perhaps unseen) examples; (2) detect when a new example is unlikely to have come from the learned distribution or (3) use it in some other downstream task. 
+Once we learn the distribution $p(x)$ can then use this learned distribution to
 
-As always, the choice of metric to measure the quality of the fit can, in general depend on the particular application at hand. In these notes, we will mostly use KL-divergence (or relative entropy)
+1. **sample** new instances from $p(x)$;
+2. **estimate the density/probability** at a datapoint $x$ and detect whether it is unlikely to have come from the learned distribution;
+3. Use the learnt distribution to make other probabilistic queries of interest.
+4. Often in the process of learning $p(x)$, we gain some insight into the structure in the form of latent variables. This can then be used of unsupervised clustering/representation learning, etc.
+
+### **Types of generative models**
+
+[TODO: Citations]
+
+There is a rich variety of models that can be utilized for the generative learning task. There are three main families:
+
+1. **Likelihood based models** which directly learn the probability mass/density function by maximizing likelihood. The main challenge is to keep the normalizing constant (keeping $p(x)$ a probability) tractable, which necessitates either strong restrictions on the model architectures or must rely on surrogate objectives to approximate maximum likelihood training. The most common subtypes are:
+
+    - **Autoregressive models** (), e.g. most LLM-s, that factorizes the probability into the product of conditional probabilities according to some sometimes natural, sometimes arbitrary ordering: $p(x)=\prod_ip(x_i\|x_{<i})$. The model then learns these conditional distributions (and some seeding distribution for $x_0$). This structure makes the evaluation of the likelihood easy, but the generation has to be sequential which can be very slow.
+    - **Variational Autoencoders (VAE)**, are latent variable models with a training methodology that jointly learns (1) what latent values are plausible for a given observation (encoder) and (2) how to decode a given value of the latent into a distribution over possible data domain instances. It does this to simultaneously optimize a surrogate loss function and close the gap between this surrogate and the likelihood.
+    - **Flow models** that learn invertible deterministic mappings between the latent space and the observation domain. Needless to say, this puts a fair amount of restriction of the architecture of this mapping.
+    - **Energy based models** [TODO]
+    - **Diffusion models** that are latent variable models, however, the latent is the path of a diffusion process and the prior latent distribution is both learnable. They can also be viewed as stochastic flows or stacked VAE-s and use a similar surrogate objective approach. They are the subject of this survey and we will go into the topic in much more detail below.
+
+2. **Implicit generative models** where the probability distribution is implicitly represented by the model of its sampling process. They often require adversarial training which is notoriously unstable and often leads to model collapse.
+
+   - **Generative Adversarial Networks (GAN)**, the state of the art for quite some time, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart. They have excellent generation properties but are notoriously hard to train.
+
+3. **Score based generative models** that lets go of tracking the normalization constant and instead models the gradient of the log-likelihood often referred to as the Stein score. They can be directly estimated by score-networks through a procedure known as score matching. They achieved state of the art performance at the time on many tasks.
+
+### Evaluating generative models
+
+
+The primary choice of metric to measure the quality of the fit can, in general depend on the particular application at hand. In these notes, we will mostly use KL-divergence (or relative entropy)
 
 $$ D(q \| p) = \int q(x)\log\frac{q(x)}{p(x)} dx $$
 
@@ -40,18 +68,6 @@ can be approximated by Monte-Carlo sampling as the average negative log-likeliho
 $$ CE(q \| p) \approx -\frac{1}{|data|}\sum_{i\in data}\log p(x_i)$$
 
 This, of course, comes at the price that we never know how far from the optimum we are with a particular model.
-
-Now we only need to learn $p(x_i)$ and sample from it, there are several mainstream approaches to do this: 
-
-- **Autoregressive models**, e.g. most LLM-s, that factorize $p(x)=\prod_ip(x_i\|x_{<i})$ into the product of conditional probabilities where the next "token" is determined by looking at the previous "tokens" according to some (sometimes arbitrary, sometimes natural) ordering.
-
-- **Generative Adversarial Networks (GAN)**, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart.
-
-- **Variational Autoencoders (VAE)**, which is a latent variable model that jointly learns to approximate the  optimal latent distribution using an encoder and to decode the latent into an image.
-
-- **Flow models**, [...]
-
-- **Diffusion models**, the subject of this piece, that are similar to VAEs, however, their latent variable is the path of a diffusion process and the prior latent distribution is both learnable and tractable.
 
 ## III. Unconditioned generation with Diffusions
 
@@ -107,7 +123,7 @@ The model probability can then be computed as
 
 $$ p_\theta(x_0) =\int p_{\theta}(x_0|x_{1:T}) p(x_{1:T})dx_{1:T}= \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
 
-In the latent variable language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this high dimensional integral is usually impossibly expensive to even approximate directly. The reader's thoughts might drift to do Monte Carlo sampling starting with the Gaussian $p(x_T)$, however, that leads to a very high variance estimator. This is because, most latents $x_{1:T}$ don't make sense for $x_0$ and will have very low conditional probability while we have a very high chance of missing high conditional probability latents.
+In the latent variable language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this high dimensional integral is usually impossibly expensive to even approximate directly. The reader's thoughts might drift to do Monte Carlo sampling starting with the Gaussian $p(x_T)$, however, that leads to a very high variance estimator. This is because, most latents $x_{1:T}$ don't make sense for $x_0$ and will have very low conditional probability while we have a very high chance of missing high conditional probability latents. In short, the prior is great for sampling but not good for evaluation in training.
 
 The VAE analogy comes to the rescue by guiding us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values given $x_0$. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
 
