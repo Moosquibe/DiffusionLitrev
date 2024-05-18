@@ -9,7 +9,7 @@ layout: home
 
 Generative AI is about how we can conjure different media from our imagination and a little noise and is thus the closest thing we have to magic. Large Language Models (LLM) can now seamlessly chat with us, while other models create songs, images, or even videos from a single text prompt. Motivated by the desire to peek behind the curtain and demystify the magic behind modern generative AI, this survey focuses on a group of models giving the state of the art in image and video sythesis called Diffusion Models.
 
-As mentioned, my main motivation here is to teach myself how the sausage is made, you rarely learn something as well as when you teach it for the first time. While there is no shortage of often excellent self-teach resources, including the original papers, blog posts YouTube videos, etc, I found that some details are not properly explained anywhere, implementations are often hard to access and holistic overviews are rare.
+As mentioned, my main motivation here is to teach myself how the sausage is made, you rarely learn something as well as when you teach it for the first time. While there is no shortage of often excellent self-teach resources, including the original papers, blog posts YouTube videos, etc, I found that some details are not properly explained anywhere, implementations are often hard to access and accessible holistic overviews are rare as well. These notes therefore attempt to fill the void by providing a deep dive, zero-to-hero style overview.
 
 ## II. Generative AI
 
@@ -50,24 +50,25 @@ There is a rich variety of models that can be utilized for the generative learni
 
 ### Evaluating generative models
 
-
-The primary choice of metric to measure the quality of the fit can, in general depend on the particular application at hand. In these notes, we will mostly use KL-divergence (or relative entropy)
+The most natural criterion to judge performance is how well the model distribution $p(x)$ matches the distribution of $q(x)$ of the data. There are several ways to measure how "far" two probability distributions are, and the particular choice could depend on the particular application at hand. However, the most common choice is to use KL-divergence (also known as relative entropy) due to its connection to the likelihood function. It is defined as
 
 $$ D(q \| p) = \int q(x)\log\frac{q(x)}{p(x)} dx $$
 
-to capture the dissimilarity of $q(x)$ and $p(x)$. As it is well known, the KL-divergence is not symmetric, that is $D(q \| p) \neq D(p \| q)$. The reason behind the particular choice of $D(q \| p)$ is that the integrand above is non-zero over the empirical data distribution observed in the training set. Note however, that it is not possible to evaluate the KL-divergence as is, due to the very fact that $q(x)$ is unknown. Thus instead, we note that
+and measures the dissimilarity of $q(x)$ and $p(x)$. It is not symmetric, $D(q \| p) \neq D(p \| q)$,the reason behind the particular choice here is that the integrand above will then be encouraged to be non-zero over the empirical data distribution observed in the training set. The first challenge about KL-divergence is that we cannot evaluate it due to the very fact that $q(x)$ (note that even sampling wouldn't help due to $\log q(x)$). However, note that
 
 $$ D(q \| p) = CE(q \| p) - H_q(X),$$
 
-where the entropy $H_q(X) = -\int q(x)\log q(x) dx$ does not depend on $p(x)$ and does not need to be optimized. On the other hand, the cross-entropy 
+where the entropy $H_q(X) = -\int q(x)\log q(x) dx$ does not depend on $p(x)$ and does not need to be optimized. On the other hand, the cross-entropy
 
 $$CE(q \| p) = -\int q(x) \log p(x) dx$$
 
-can be approximated by Monte-Carlo sampling as the average negative log-likelihood of the data under the model:
+can now be approximated by Monte-Carlo sampling as the average negative log-likelihood of the data under the model distribution:
 
 $$ CE(q \| p) \approx -\frac{1}{|data|}\sum_{i\in data}\log p(x_i)$$
 
 This, of course, comes at the price that we never know how far from the optimum we are with a particular model.
+
+[Generation metrics: TODO]
 
 ## III. Unconditioned generation with Diffusions
 

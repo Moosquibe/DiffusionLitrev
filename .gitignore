@@ -160,3 +160,9 @@ bazel-*
 
 # Jupyter
 .DS_Store
+
+# VS-Code
+.vscode
+
+# Downloaded data
+notebooks/datasets
