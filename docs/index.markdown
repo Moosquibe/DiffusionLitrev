@@ -105,9 +105,11 @@ It will be helfpul to think in analogy with VAE-s where the diffusion trajectory
 
 The model probability can then be computed as
 
-$$ p_\theta(x_0) = \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
+$$ p_\theta(x_0) =\int p_{\theta}(x_0|x_{1:T}) p(x_{1:T})dx_{1:T}= \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
 
-In the VAE language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this integral is usually highly intractable but the VAE analogy guides us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
+In the latent variable language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this high dimensional integral is usually impossibly expensive to even approximate directly. The reader's thoughts might drift to do Monte Carlo sampling starting with the Gaussian $p(x_T)$, however, that leads to a very high variance estimator. This is because, most latents $x_{1:T}$ don't make sense for $x_0$ and will have very low conditional probability while we have a very high chance of missing high conditional probability latents.
+
+The VAE analogy comes to the rescue by guiding us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values given $x_0$. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
 
 $$
 p(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
@@ -282,7 +284,7 @@ and is consequently fairly expensive consisting of the generation of $B$ traject
     (b) transform it into $\hat{\mu}_t^{(B)}=\mu_\theta(x_t^{(B)}, \hat \varepsilon_t^{(B)})$
 
     (c) evaluate $p_{\theta}(x_{t-1}^{(B)}|x_t^{(B)})=\mathcal{N}(x_{t-1}^{(B)}; \hat{\mu}_t^{(B)}, \sigma_t^2 I)$ using the Gaussian pdf.
-3. For each $b = 1, ..., B$, compute $p_B(x_0) by evaluating Gaussians to get the rest of the integrand. The final step involves the discretization step.
+3. For each $b = 1, ..., B$, compute $p_B(x_0)$ by evaluating Gaussians to get the rest of the integrand. The final step involves the discretization step.
 4. Output $p(x_0) = \frac{1}{B}\sum_{b=1}^Bp_B(x_0)$
 
 #### **Sampling**
