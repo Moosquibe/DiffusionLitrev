@@ -11,6 +11,8 @@ Generative AI is about how we can conjure different media from our imagination a
 
 As mentioned, my main motivation here is to teach myself how the sausage is made, you rarely learn something as well as when you teach it for the first time. While there is no shortage of often excellent self-teach resources, including the original papers, blog posts YouTube videos, etc, I found that some details are not properly explained anywhere, implementations are often hard to access and accessible holistic overviews are rare as well. These notes therefore attempt to fill the void by providing a deep dive, zero-to-hero style overview.
 
+When I have the time, I plan to provide educationally motivated PyTorch implementations in the associated [GitHub Repository](https://github.com/Moosquibe/DiffusionLitrev). This will also allow me to do my own experiments and comparisons on which I will report in a section below.
+
 ## II. Generative AI
 
 In abstract form, the task of Generative AI can be phrased deceptively simply:
@@ -54,7 +56,7 @@ There are several ways to measure how "far" two probability distributions are, a
 
 It is usually uncommon to discuss metrics first, but I find that during the exposition dump of a large sequence of different modelling approaches, it is hard to keep track of how to compare them. This is of course a non-exhaustive list as new metrics are invented every day.
 
-#### Kullback-Leibler divergence
+#### **Kullback-Leibler divergence**
 
 The most natural criterion to judge performance is how well the model distribution $p(x)$ matches the distribution of $q(x)$ of the data.  However, the most common choice is to use KL-divergence (also known as relative entropy) due to its connection to the likelihood function (thus especially favored by likelihood based learning). It is defined as
 
@@ -76,7 +78,7 @@ where $N$ is the size of the dataset. This, of course, comes at the price that w
 
 Drawbacks of likelihood as a metric include that high likelihood models can have arbitrarily terrible generated samples as pointed out in [Theis et al, 2016](https://arxiv.org/pdf/1511.01844) and vica versa.
 
-#### Fisher divergence
+#### **Fisher divergence**
 
 In some models, for example ones based on score matching, we cannot tracktably compute the normalization constant and therefore the full probability. In this case, we can resort to computing their scores
 
@@ -92,15 +94,15 @@ $$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta
 
 where $p_v$ is a Rademacher (uniform on the vertices of the $D$ dimensional hypercube $\{\pm 1\}^D$) or an isotropic stadard normal.
 
-#### Inception Score (IS)
+#### **Inception Score (IS)**
 
-IS, introduced by [Salimans et al., 2016](https://arxiv.org/pdf/1606.03498) to evaluate GAN-s, is a metric that evaluates generation by how well the generated images match the real images in the dataset in terms of their diversity and quality using statistic of the popular Inception v3 deep convolutional network designed for classification tasks on ImageNet. For a given image, it produces a vector of conditional probabilities $p_i(y|x)$ over the thousand Image labels.
+IS, introduced by [Salimans et al., 2016](https://arxiv.org/pdf/1606.03498) to evaluate GAN-s, is a metric that evaluates generation by how well the generated images match the real images in the dataset in terms of their diversity and quality using statistic of the popular Inception v3 deep convolutional network designed for classification tasks on ImageNet. For a given image, it produces a vector of conditional probabilities $p_i(y\|x)$ over the thousand Image labels.
 
 IS is then defined as the exponential of the expected KL divergence between the conditional and the marginal distribution under the generative distribution:
 
 $$ IS = \exp(\mathbb{E}_{x\sim p_{\theta}}D_{KL}(p_{i}(y|x)\|p_i(y))),$$
 
-where $p_i(y) = \mathbb{E}_{x\sim p_\theta}p_i(y|x)$ is the marginal class distribution. To see what this metric is trying to accomplish, note that some easy manipulation shows
+where $p_i(y) = \mathbb{E}_{x\sim p_\theta}p_i(y\|x)$ is the marginal class distribution. To see what this metric is trying to accomplish, note that some easy manipulation shows
 
 $$ \log IS = I(y;x) = H(y)-H(y|x),$$
 
@@ -110,15 +112,27 @@ that is, the logarithm of the IS is the mutual information between the class dis
 
 #### Frechet Inception Distance (FID)
 
-[TODO]
+Introduced by [Heusel et al., 2017](https://papers.nips.cc/paper_files/paper/2017/file/8a1d694707eb0fefe65871369074926d-Paper.pdf), FID also uses the Inception v3 model but without the final classification layer producing a 2048 dimensional activation vector. We then apply this both to the generated samples and the data distribution and fit a Gaussians on the resulting datapoints for each (fitting just means taking sample averages and computing empirical covariances) Finally the FID is calculated as the Frechet(Wasserstein-2)-distance of the resulting two normals:
 
+$$ FID = d_F(\mathcal{N}(\mu_p, \Sigma_p), \mathcal{N}(\mu_q, \Sigma_q)), $$
 
+where the Frechet distance of two probability distributions is defined as
 
-[Generation metrics: TODO]
+$$ d_F(\nu_1, \nu_2) = \left(\inf_{\gamma\in\Gamma(\nu_1, \nu_2)}\mathbb{E}_{(x_1,x_2)\sim\gamma}\|x_1 - x_2\|^2\right)^{\frac{1}{2}}. $$
+
+Here $\Gamma(\nu_1,\nu_2)$ is the set of probability distributions such that their marginals are $\nu_1$, and $\nu_2$. For Gaussians, this takes a simple form which translates to
+
+$$ FID = \|\mu_p - \mu_q\|^2 + \mathrm{Tr}\left(\Sigma_p+\Sigma_q - 2(\Sigma_p\Sigma_q)^{\frac{1}{2}}\right)$$
+
+Unfortunately FID, suffers from many of the same limitations of IS and care should be exercised when relying on it. For example, memorizing the training set will likely result in both very high FID and IS.
+
+Finally, we mention that while strictly speaking FID only applies to image generation, [Unterthiner et. al, 2019](https://openreview.net/pdf?id=rylgEULtdN) proposed versions (FVD) for video generation by replacing Inception v3 with a network that considers the temporal coherence of the visual content across a sequence of frames as well. Similarly, [Kilgour et al., 2019](https://arxiv.org/pdf/1812.08466) proposed a variant (FAD) that is suitable for models generating audio.
+
+[Other Generation metrics: TODO]
 
 ## III. Unconditioned generation with Diffusions
 
-As with any other type of generative models, [...]
+After this long introduction, let us finally dive into diffusion models.
 
 ### (a) The forward process
 
@@ -164,7 +178,7 @@ To summarize, the Markov chain morphs the initial intractable distribution $q(x_
 
 #### **The model probability**
 
-It will be helfpul to think in analogy with VAE-s where the diffusion trajectory $z = x_{1:T}$ is for all intents and purposes a complex hidden variable. Then $q(x_{1:T} | x_0)$ plays the role of the encoder and we are looking to learn both the full prior latent distribution $p_\theta(x_{1:T})$ and the decoder $p_{\theta}(x_0|x_{1:T}). In what follows, we will use the VAE analogy often. The full prior distribution of the latent is obtained by takinga fixed $p(x_T)$ to be an isotropic standard multivariate Gaussian and using a learned Markov process working backwards on trajectory. In particular, we start with a Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ at time $T$ and proceed backward according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ that we will learn. With this, the decoder becomes $p_{\theta}(x_0|x_{1:T})= p_{\theta}(x_0|x_1)$.
+It will be helfpul to think in analogy with VAE-s where the diffusion trajectory $z = x_{1:T}$ is for all intents and purposes a complex hidden variable. Then $q(x_{1:T} \| x_0)$ plays the role of the encoder and we are looking to learn both the full prior latent distribution $p_\theta(x_{1:T})$ and the decoder $p_{\theta}(x_0\|x_{1:T}). In what follows, we will use the VAE analogy often. The full prior distribution of the latent is obtained by takinga fixed $p(x_T)$ to be an isotropic standard multivariate Gaussian and using a learned Markov process working backwards on trajectory. In particular, we start with a Gaussian $p(x_T) \sim \mathcal{N}(x_T; 0, I)$ at time $T$ and proceed backward according to a parametrized transition kernel $p_{\theta}(x_{t-1} | x_t)$ that we will learn. With this, the decoder becomes $p_{\theta}(x_0|x_{1:T})= p_{\theta}(x_0|x_1)$.
 
 The model probability can then be computed as
 
@@ -172,7 +186,7 @@ $$ p_\theta(x_0) =\int p_{\theta}(x_0|x_{1:T}) p(x_{1:T})dx_{1:T}= \int p(x_T)\p
 
 In the latent variable language, this corresponds to $p(x_0) = \int p(x_0, z)dz$, computing the model probability by enumerating all possible latents that could produced $x_0$. As a result, this high dimensional integral is usually impossibly expensive to even approximate directly. The reader's thoughts might drift to do Monte Carlo sampling starting with the Gaussian $p(x_T)$, however, that leads to a very high variance estimator. This is because, most latents $x_{1:T}$ don't make sense for $x_0$ and will have very low conditional probability while we have a very high chance of missing high conditional probability latents. In short, the prior is great for sampling but not good for evaluation in training.
 
-The VAE analogy comes to the rescue by guiding us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values given $x_0$. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}|x_0) = \prod_{i=1}^Tq(x_t|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
+The VAE analogy comes to the rescue by guiding us towards utilizing the forward trajectory in an importance sampling scheme to emphasize plausible latent values given $x_0$. In other words, the latent proposal distribution is chosen to be $q(x_{1:T}\|x_0) = \prod_{i=1}^Tq(x_t\|x_{t-1})$, that is, the law of the forward trajectory launched from the starting point $x_0. With this,
 
 $$
 p(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
@@ -201,7 +215,7 @@ $$
 where the expectation is now taken over the full trajectory $x_{0:T}$. 
 Since Jensens was only applied to the inner expectation, equality here holds if and only if the term under the log is the same for all trajectories $x_{1:T}$ which implies $q(x_{1:T}|x_0)\sim p_\theta(x_{1:T}, x_0)$. After normalization, this translates to $q(x_{1:T}|x_0) = p_\theta(x_{1:T}| x_0)$ that is when the distribution of the forward trajectory is exactly the posterior of $x_{1:T}$ under $p_{\theta}$ given $x_0$.
 
-This exact posterior is, of course, no easier to compute than the model probability itself, and VAEs try to jointly optimize the encoder $q(z|x)$ and the decoder $p(x|z)$ to simultaneously close the Jensen-gap and the optimize the bound. In our situation, however, the distribution of the forward process is fairly rigidly prescribed with the $\beta_t$-s being the only (potentially) learnable *variational parameters*. The hope is that the trainable full prior will bring us closer to this fixed $q$ instead.
+This exact posterior is, of course, no easier to compute than the model probability itself, and VAEs try to jointly optimize the encoder $q(z\|x)$ and the decoder $p(x\|z)$ to simultaneously close the Jensen-gap and the optimize the bound. In our situation, however, the distribution of the forward process is fairly rigidly prescribed with the $\beta_t$-s being the only (potentially) learnable *variational parameters*. The hope is that the trainable full prior will bring us closer to this fixed $q$ instead.
 
 At this point one could provide the parametrization for $p_{\theta}$, evaluate with Monte-Carlo, take gradients and train as usual. This sampling, however is fairly expensive and it turns out we can do better. Let us first separate the edge terms at $t = 0$ and $t=T$ in $L$:
 
@@ -209,25 +223,25 @@ $$
 L = -\mathrm{E}_q\log p(x_T) -\sum_{t=2}^T\mathrm{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1})} - \mathbb{E}_q\log\frac{p_\theta(x_0 | x_1)}{q(x_1|x_0)}
 $$
 
-Note that the only possible learnable parameters in the first term (which is a cross-entropy between $q(x_T|x_0)$ and $p(x_T)$) are the $\beta_t$-s. On the other end, [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) eliminates the last term by pinning $p_\theta(x_0 | x_1)$ to equal the reverse of $q(x_1|x_0)$ under the stationary distribution of the forward process (which is an isotropic Gaussian):
+Note that the only possible learnable parameters in the first term (which is a cross-entropy between $q(x_T\|x_0)$ and $p(x_T)$) are the $\beta_t$-s. On the other end, [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) eliminates the last term by pinning $p_\theta(x_0 \| x_1)$ to equal the reverse of $q(x_1\|x_0)$ under the stationary distribution of the forward process (which is an isotropic Gaussian):
 
 $$
-p_\theta(x_0 | x_1) = q(x_1|x_0)\frac{\pi(x_0)}{\pi(x_1)}.
+p_\theta(x_0 \| x_1) = q(x_1\|x_0)\frac{\pi(x_0)}{\pi(x_1)}.
 $$
 
-This is however a somewhat arbitrary choice as the forward chain is definitely not in stationary state at the start unless $q(x_0)=\pi(x_0)$ which never happens. Therefore, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) decided to learn $p_{\theta}(x_0|x_1)$ separately.
+This is however a somewhat arbitrary choice as the forward chain is definitely not in stationary state at the start unless $q(x_0)=\pi(x_0)$ which never happens. Therefore, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) decided to learn $p_{\theta}(x_0\|x_1)$ separately.
 
-The key element though is what we do with the terms in the middle sum and what parametric form should $p_\theta$ have. First note that these terms are almost KL-divergences but not quite because the probabilities in the numerator and the denumerator are over different variables. To rectify this, we should reverse the $q(x_t| x_{t-1})$ term using Bayes's theorem:
+The key element though is what we do with the terms in the middle sum and what parametric form should $p_\theta$ have. First note that these terms are almost KL-divergences but not quite because the probabilities in the numerator and the denumerator are over different variables. To rectify this, we should reverse the $q(x_t\| x_{t-1})$ term using Bayes's theorem:
 
 $$
 q(x_t|x_{t-1})=q(x_{t-1} | x_t) \frac{q(x_{t-1})}{q(x_{t})}
 $$
 
-Note, however, that the way to compute this is to condition on $x_0$ and integrate over the intermediate variables. Since $q(x_0)$ is a very complicated distribution, the result will not be Gaussian and we would have to sample from the training set at best. Instead, a very neat trick is to use the Markov property to realize $q(x_t|x_{t-1}) = q(x_t|x_{t-1}, x_0)$ and then apply Bayes theorem to this conditioned version,
+Note, however, that the way to compute this is to condition on $x_0$ and integrate over the intermediate variables. Since $q(x_0)$ is a very complicated distribution, the result will not be Gaussian and we would have to sample from the training set at best. Instead, a very neat trick is to use the Markov property to realize $q(x_t\|x_{t-1}) = q(x_t\|x_{t-1}, x_0)$ and then apply Bayes theorem to this conditioned version,
 
 $$ q(x_t|x_{t-1}) = q(x_{t-1} | x_t, x_0) \frac{q(x_t|x_0)}{q(x_{t-1}|x_0)}. $$
 
-The gain is that now everything is Gaussian, which is by definition for everything but $q(x_{t-1}|x_t, x_0)$ which is then Gaussian by the virtue of this equation. Plugging this back into the middle term in $L$ we get
+The gain is that now everything is Gaussian, which is by definition for everything but $q(x_{t-1}\|x_t, x_0)$ which is then Gaussian by the virtue of this equation. Plugging this back into the middle term in $L$ we get
 
 $$ \mathbb{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1})} = \mathbb{E}_q\log\frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)} + \mathbb{E}_q \log\frac{q(x_{t-1}|x_0)}{q(x_{t}|x_0)}, $$
 
@@ -241,15 +255,15 @@ L = &-\mathbb{E}_q\log \frac{p(x_T)}{q(x_T|x_0)} - \sum_{t=2}^T\mathbb{E}_q\log\
 \end{align*}
 $$
 
-$L_T$ is the KL-divergence between two Gaussians and. Note that $q(x_T|x_0)$ will not be perfectly an isotropic Gaussian other than the trivial case when $\beta_t = 1$ for some $t$ and just like with VAE-s, we sample the latent somewhat differently upon training and inference/sampling (but this term is trying to keep them close). If the $\beta_t$-s are not trainable then this term has no trainable component and can be dropped.
+$L_T$ is the KL-divergence between two Gaussians and. Note that $q(x_T\|x_0)$ will not be perfectly an isotropic Gaussian other than the trivial case when $\beta_t = 1$ for some $t$ and just like with VAE-s, we sample the latent somewhat differently upon training and inference/sampling (but this term is trying to keep them close). If the $\beta_t$-s are not trainable then this term has no trainable component and can be dropped.
 
 #### **The parametrization of the backwards model**
 
-To optimize $L_t$, note that it is the KL-divergence between a Gaussian variable and $p_{\theta}(x_{t-1}| x_t)$. This suggests choosing $p_{\theta}$ to be a Gaussian with parametrizable mean and variance:
+To optimize $L_t$, note that it is the KL-divergence between a Gaussian variable and $p_{\theta}(x_{t-1}\| x_t)$. This suggests choosing $p_{\theta}$ to be a Gaussian with parametrizable mean and variance:
 
 $$ p_\theta(x_{t-1}|x_t) = \mathcal{N}(x_{t-1}, \mu_{\theta}(x_t, t), \Sigma_{\theta}(x_t, t)) \qquad 1<t\leq T.$$
 
-This is particularly nice, because the KL-divergence between two Gaussians can be computed in closed form in terms of their parameters. All we need for that then is to compute said parameters of $q(x_{t-1}|x_t, x_0)$:
+This is particularly nice, because the KL-divergence between two Gaussians can be computed in closed form in terms of their parameters. All we need for that then is to compute said parameters of $q(x_{t-1}\|x_t, x_0)$:
 
 $$
 \begin{align*}
@@ -272,7 +286,7 @@ $$\tilde\mu(x_t, x_0) = \tilde\mu(x_t, \bar\varepsilon_t) =  \frac{1}{\sqrt{\alp
 
 #### **The final form of the objective**
 
-This means that $q(x_{t-1}|x_t, x_0) = \mathcal{N}(x_{t-1}; \tilde\mu(x_t, \bar\varepsilon_t), \tilde{\beta} I)$ and one can use the well known formula
+This means that $q(x_{t-1}\|x_t, x_0) = \mathcal{N}(x_{t-1}; \tilde\mu(x_t, \bar\varepsilon_t), \tilde{\beta} I)$ and one can use the well known formula
 
 $$ D_{KL}(\mathcal{N}_1, \mathcal{N}_2) = \frac{1}{2}\left[\mathrm{Tr}(\Sigma_2^{-1}\Sigma_1) - k + (\mu_2 -\mu_1)\Sigma_2^{-1}(\mu_2 -\mu_1) + \log\frac{\mathrm{det}\Sigma_1}{\mathrm{det}\Sigma_2}\right]$$
 
@@ -303,7 +317,7 @@ Other than the weighting factor before the expectation, this says that we want t
 
 #### **The decoder**
 
-As we mentioned, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) derives a discrete decoder $p_{\theta}(x_0|x_1)$ to obtain valid images assuming that all image data consists of integers in ${0, 1, \dots, 255}$ linearly scaled to $[-1, 1]$.
+As we mentioned, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) derives a discrete decoder $p_{\theta}(x_0\|x_1)$ to obtain valid images assuming that all image data consists of integers in ${0, 1, \dots, 255}$ linearly scaled to $[-1, 1]$.
 
 $$
 p_{\theta}(x_0|x_1) = \prod_{i=1}^D\int_{\delta_-(x_0^i)}^{\delta_+(x_0^i)} \mathcal{N}(x; \mu_{\theta}^i(x_1, 1), \sigma_1^2)dx
@@ -344,9 +358,9 @@ and is consequently fairly expensive consisting of the generation of $B$ traject
 
     (a) $\hat\varepsilon_t^{(B)} = \varepsilon_\theta(x_t^{(B)}, t)$
 
-    (b) transform it into $\hat{\mu}_t^{(B)}=\mu_\theta(x_t^{(B)}, \hat \varepsilon_t^{(B)})$
+    (b) transform it into $\hat{\mu}_t^{(B)}= \mu _{\theta}(x_t^{(B)}, \hat \varepsilon_t^{(B)})$
 
-    (c) evaluate $p_{\theta}(x_{t-1}^{(B)}|x_t^{(B)})=\mathcal{N}(x_{t-1}^{(B)}; \hat{\mu}_t^{(B)}, \sigma_t^2 I)$ using the Gaussian pdf.
+    (c) evaluate $p_{\theta}(x_{t-1}^{(B)}\|x_t^{(B)})=\mathcal{N}(x_{t-1}^{(B)}; \hat{\mu}_t^{(B)}, \sigma_t^2 I)$ using the Gaussian pdf.
 3. For each $b = 1, ..., B$, compute $p_B(x_0)$ by evaluating Gaussians to get the rest of the integrand. The final step involves the discretization step.
 4. Output $p(x_0) = \frac{1}{B}\sum_{b=1}^Bp_B(x_0)$
 
