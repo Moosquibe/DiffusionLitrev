@@ -1,8 +1,12 @@
 # :construction: Interactive Diffusion Literature Review - a tour of diffusion models :construction:
 
-This repo is an ongoing educational journey into diffusion models. The goal is to provide a litreview with a progressively expanding collection of PyTorch reference implementations of the most important diffusion model milestones. Whenever possible, I prefer to keep training and inference runnable locally on an average modern MacBook, so I will rely more on small popular datasets and occasional synthetic data. Then name implies that by the time I finish, these models will be fairly "retro" (some of them already are). I plan to also write some survey notes.
+This repo is an ongoing educational journey into diffusion models. The goal is to provide a litreview with a progressively expanding collection of PyTorch reference implementations of the most important diffusion model milestones. Whenever possible, I prefer to keep training and inference runnable locally on an average modern MacBook, so I will rely more on small popular datasets and occasional synthetic data. Then name implies that by the time I finish, these models will be fairly "retro" (some of them already are). I am also writing a comprehensive [survey post](https://moosquibe.github.io/DiffusionLitrev/).
 
-Here is a long list of papers I plan to cover tentatively. This list will probably be categorized or somewhat pruned. No promises.
+## Roadmap
+
+I will first do a thorough literature review to have a better understanding of what is worth implementing. The result will be a deep dive survey [on a Github page](https://moosquibe.github.io/DiffusionLitrev/).
+
+Then I will start making some educational implementations of the most important architectures. Here is a long list of papers I plan to cover tentatively. This list will probably be heavily edited or somewhat pruned. No promises.
 
 | Name                                                               | Authors                   | ArXiv Link                                         | Year | Note                                                               |
 |--------------------------------------------------------------------|---------------------------|----------------------------------------------------|------|--------------------------------------------------------------------|
