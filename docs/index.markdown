@@ -15,18 +15,18 @@ As mentioned, my main motivation here is to teach myself how the sausage is made
 
 In abstract form, the task of Generative AI can be phrased deceptively simply:
 
-> Given a highly complex, high dimensional distribution $q(x)$ can we learn the structure of this distribution from a possibly large but nevertheless finite set of examples and produce a reasonable approximation $p(x)\approx q(x)$.
+> Given a highly complex, high dimensional distribution $q(x)$ can we learn the structure of this distribution from a possibly large but nevertheless finite set of examples and produce a reasonable approximation $p_\theta(x)\approx q(x)$.
 
 For some typical example domains, a second of standard sample rate (44.1kHz) audio can be described by an amplitude vector $x\in\mathbb{R}^{44100}$. A 12 Megapixel RGB image taken by a modern iPhone is representing by an intensity vector in $\mathbb{R}^{3\times 4000\times 3000}$ which uses 36M dimensions. A second of 4K RGB video at 60Hz refresh rate lives in $\mathbb{R}^{3\times 3840\times 2160\times 60}$ which is a ~1.5B dimensional space.
 
 It is not hard to imagine that the overwhelming majority of points in these spaces correspond to jibberish and the meaningful media content lies on a vastly lower dimensional submanifold. This is the famous *manifold hypothesis*. We can hardly hope to be able to characterize this submanifold exactly, let alone tractably describe probability distributions over them, however, we can reasonably hope that ML models can learn them with lot less impediment from the curse of dimensionality than the ambient dimension would suggest.
 
-Once we learn the distribution $p(x)$ can then use this learned distribution to
+Once we learn the distribution $p_\theta(x)$ can then use this learned distribution to
 
-1. **sample** new instances from $p(x)$;
-2. **estimate the density/probability** at a datapoint $x$ and detect whether it is unlikely to have come from the learned distribution;
-3. Use the learnt distribution to make other probabilistic queries of interest.
-4. Often in the process of learning $p(x)$, we gain some insight into the structure in the form of latent variables. This can then be used of unsupervised clustering/representation learning, etc.
+1. **Sample** new instances from $p_\theta(x)$;
+2. **Estimate the density/probability** at a datapoint $x$ and detect whether it is unlikely to have come from the learned distribution;
+3. Use the learnt distribution to make other **probabilistic queries** of interest;
+4. Often in the process of learning $p(x)$, we gain some insight into the structure in the form of latent variables. This can then be used of **unsupervised clustering/representation learning**, etc.
 
 ### **Types of generative models**
 
@@ -38,19 +38,25 @@ There is a rich variety of models that can be utilized for the generative learni
 
     - **Autoregressive models** (), e.g. most LLM-s, that factorizes the probability into the product of conditional probabilities according to some sometimes natural, sometimes arbitrary ordering: $p(x)=\prod_ip(x_i\|x_{<i})$. The model then learns these conditional distributions (and some seeding distribution for $x_0$). This structure makes the evaluation of the likelihood easy, but the generation has to be sequential which can be very slow.
     - **Variational Autoencoders (VAE)**, are latent variable models with a training methodology that jointly learns (1) what latent values are plausible for a given observation (encoder) and (2) how to decode a given value of the latent into a distribution over possible data domain instances. It does this to simultaneously optimize a surrogate loss function and close the gap between this surrogate and the likelihood.
-    - **Flow models** that learn invertible deterministic mappings between the latent space and the observation domain. Needless to say, this puts a fair amount of restriction of the architecture of this mapping.
+    - **Normalizing flow models** that learn invertible deterministic mappings between the latent space and the observation domain and uses it to transform the latent densities to densities in the data domain. Needless to say, the invertibility puts a fair amount of restriction of the architecture of this mapping has been restricted to continuous distributions.
     - **Energy based models** [TODO]
     - **Diffusion models** that are latent variable models, however, the latent is the path of a diffusion process and the prior latent distribution is both learnable. They can also be viewed as stochastic flows or stacked VAE-s and use a similar surrogate objective approach. They are the subject of this survey and we will go into the topic in much more detail below.
 
-2. **Implicit generative models** where the probability distribution is implicitly represented by the model of its sampling process. They often require adversarial training which is notoriously unstable and often leads to model collapse.
+2. **Implicit generative models** where the probability distribution is implicitly represented by its sampling process but without a tracktable density/mass function. They often require adversarial training which is notoriously unstable and often leads to model collapse.
 
    - **Generative Adversarial Networks (GAN)**, the state of the art for quite some time, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart. They have excellent generation properties but are notoriously hard to train.
 
-3. **Score based generative models** that lets go of tracking the normalization constant and instead models the gradient of the log-likelihood often referred to as the Stein score. They can be directly estimated by score-networks through a procedure known as score matching. They achieved state of the art performance at the time on many tasks.
+3. **Score based generative models** that lets go of tracking the normalization constant and instead models the gradient of the log-likelihood often referred to as the Stein score. They can be directly estimated by score-networks through a procedure known as score matching after which generation is possible using Langevin dynamics. They achieved state of the art performance at the time on many tasks. The drawback is that when according to the manifold hypothesis the ambient space is very high dimensional but the data lies on a much much smaller manifold, taking gradients in the ambient space can become somewhat ill defined.
 
 ### Evaluating generative models
 
-The most natural criterion to judge performance is how well the model distribution $p(x)$ matches the distribution of $q(x)$ of the data. There are several ways to measure how "far" two probability distributions are, and the particular choice could depend on the particular application at hand. However, the most common choice is to use KL-divergence (also known as relative entropy) due to its connection to the likelihood function. It is defined as
+There are several ways to measure how "far" two probability distributions are, and the particular choice could depend on the application at hand. Indeed, [Theis et al, 2016](https://arxiv.org/pdf/1511.01844) showed that unless the true data generating process is a member of the model class, which virtually never happens in practice, different objective functions can lead to very different results. Understanding the trade-offs is thus crucial for choosing the right metric for the application at hand. Moreover, it is important not to take good performance in one application as evidence of similar performance in another one. For example, [Theis et al, 2016](https://arxiv.org/pdf/1511.01844) shows that high likelihood and realistic image synthesis properties do not imply each other at all.
+
+It is usually uncommon to discuss metrics first, but I find that during the exposition dump of a large sequence of different modelling approaches, it is hard to keep track of how to compare them. This is of course a non-exhaustive list as new metrics are invented every day.
+
+#### Kullback-Leibler divergence
+
+The most natural criterion to judge performance is how well the model distribution $p(x)$ matches the distribution of $q(x)$ of the data.  However, the most common choice is to use KL-divergence (also known as relative entropy) due to its connection to the likelihood function (thus especially favored by likelihood based learning). It is defined as
 
 $$ D(q \| p) = \int q(x)\log\frac{q(x)}{p(x)} dx $$
 
@@ -64,9 +70,42 @@ $$CE(q \| p) = -\int q(x) \log p(x) dx$$
 
 can now be approximated by Monte-Carlo sampling as the average negative log-likelihood of the data under the model distribution:
 
-$$ CE(q \| p) \approx -\frac{1}{|data|}\sum_{i\in data}\log p(x_i)$$
+$$ CE(q \| p) \approx -\frac{1}{N}\sum_{i=1}^N\log p(x_i)$$
 
-This, of course, comes at the price that we never know how far from the optimum we are with a particular model.
+where $N$ is the size of the dataset. This, of course, comes at the price that we never know how far from the optimum we are with a particular model.
+
+#### Fisher divergence
+
+In some models, for example ones based on score matching, we cannot tracktably compute the normalization constant and therefore the full probability. In this case, we can resort to computing their scores
+
+$$ J(\theta) = \frac{1}{2}\mathbb{E}_q\|s_p(x; \theta) - s_q(x)\|^2 $$
+
+where $s_p(x;\theta) = \nabla_x\log p_\theta(x)$ is the score of the model distribution and similarly, $s_q(x) = \nabla_x\log q(x)$ is the data distribution score. Computing the latter is clearly challenging, fortunately [Hyvarinen, 2005](https://jmlr.org/papers/volume6/hyvarinen05a/hyvarinen05a.pdf) showed that a clever integration trick can turn this into the computable
+
+$$ J(\theta) = \mathbb{E}_q\left[\mathrm{Tr}(\nabla_x s_p(x; \theta))+\frac{1}{2}\|s_p(x;\theta)\|^2\right] $$
+
+For deep neural network models, the computation of the trace is fairly prohibited since all $D$ diagonal entries have to be computed through backpropagation. [Song et al 2019a](https://arxiv.org/pdf/1905.07088) proposed to mitigate this by comparing random, one dimensional projections of the scores which leads to the *sliced score matching* matching objective:
+
+$$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta)v+\frac{1}{2}(v^T s_p(x;\theta))^2\right], $$
+
+where $p_v$ is a Rademacher (uniform on the vertices of the $D$ dimensional hypercube $\{\pm 1\}^D$) or an isotropic stadard normal.
+
+#### Inception Score (IS)
+
+IS, introduced by [Salimans et al., 2016](https://arxiv.org/pdf/1606.03498) to evaluate GAN-s, is a metric that evaluates generation by how well the generated images match the real images in the dataset in terms of their diversity and quality using statistic of the popular Inception v3 deep convolutional network designed for classification tasks on ImageNet. For a given image, it produces a vector of conditional probabilities $p_i(y|x)$ over the thousand Image labels. IS is then defined as
+
+$$ IS = \exp(\mathbb{E}_{x\sim p_{\theta}}D_{KL}(p_{i}(y|x)\|p_i(y))),$$
+
+where $p_i(y) = \mathbb{E}_{x\sim p_\theta}p_i(y|x)$ is the marginal class distribution.
+
+The IS scores images on a scale from zero being the worst to theoretically infinity the best with higher being better.
+
+It is using 
+
+#### Frechet Inception Distance (FID)
+
+
+
 
 [Generation metrics: TODO]
 
