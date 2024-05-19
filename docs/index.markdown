@@ -5,6 +5,8 @@
 layout: home
 ---
 
+:construction:
+
 ## I. Introduction
 
 Generative AI is about how we can conjure different media from our imagination and a little noise and is thus the closest thing we have to magic. Large Language Models (LLM) can now seamlessly chat with us, while other models create songs, images, or even videos from a single text prompt. Motivated by the desire to peek behind the curtain and demystify the magic behind modern generative AI, this survey focuses on a group of models giving the state of the art in image and video sythesis called Diffusion Models.
@@ -38,7 +40,7 @@ There is a rich variety of models that can be utilized for the generative learni
 
 1. **Likelihood based models** which directly learn the probability mass/density function by maximizing likelihood. The main challenge is to keep the normalizing constant (keeping $p(x)$ a probability) tractable, which necessitates either strong restrictions on the model architectures or must rely on surrogate objectives to approximate maximum likelihood training. The most common subtypes are:
 
-    - **Autoregressive models** (), e.g. most LLM-s, that factorizes the probability into the product of conditional probabilities according to some sometimes natural, sometimes arbitrary ordering: $p(x)=\prod_ip(x_i\|x_{<i})$. The model then learns these conditional distributions (and some seeding distribution for $x_0$). This structure makes the evaluation of the likelihood easy, but the generation has to be sequential which can be very slow.
+    - **Autoregressive models**, e.g. most LLM-s, that factorizes the probability into the product of conditional probabilities according to some sometimes natural, sometimes arbitrary ordering: $p(x)=\prod_ip(x_i\|x_{<i})$. The model then learns these conditional distributions (and some seeding distribution for $x_0$). This structure makes the evaluation of the likelihood easy, but the generation has to be sequential which can be very slow.
     - **Variational Autoencoders (VAE)**, are latent variable models with a training methodology that jointly learns (1) what latent values are plausible for a given observation (encoder) and (2) how to decode a given value of the latent into a distribution over possible data domain instances. It does this to simultaneously optimize a surrogate loss function and close the gap between this surrogate and the likelihood.
     - **Normalizing flow models** that learn invertible deterministic mappings between the latent space and the observation domain and uses it to transform the latent densities to densities in the data domain. Needless to say, the invertibility puts a fair amount of restriction of the architecture of this mapping has been restricted to continuous distributions.
     - **Energy based models** [TODO]
@@ -48,7 +50,9 @@ There is a rich variety of models that can be utilized for the generative learni
 
    - **Generative Adversarial Networks (GAN)**, the state of the art for quite some time, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart. They have excellent generation properties but are notoriously hard to train.
 
-3. **Score based generative models** that lets go of tracking the normalization constant and instead models the gradient of the log-likelihood often referred to as the Stein score. They can be directly estimated by score-networks through a procedure known as score matching after which generation is possible using Langevin dynamics. They achieved state of the art performance at the time on many tasks. The drawback is that when according to the manifold hypothesis the ambient space is very high dimensional but the data lies on a much much smaller manifold, taking gradients in the ambient space can become somewhat ill defined.
+3. **Score based generative models** that circumvents the difficulties of estimating the normalization constant by instead modeling the gradient of the log-probability often referred to as the Stein score. This is a vector field pointing towards increasing log-probability and can be learned by a model through a procedure called score matching. This vector field can also be used to guide a randomized process called Langevin dynamics to extract samples.
+
+They have achieved state of the art performance at the time on many tasks and later it was discovered that they are very tightly related to Diffusion Processes in that both can be viewed as discretization of Stochastic Differential Equations (SDE) driven by score functions.
 
 ### Evaluating generative models
 
@@ -110,7 +114,7 @@ that is, the logarithm of the IS is the mutual information between the class dis
 
 [Barratt & Sharma, 2018](https://arxiv.org/pdf/1801.01973) pointed out several weaknesses of this metric, including non-robustness under the Inception model's retraining and its non-transferrability to image datasets other than ImageNet. They also show how optimizing for IS (either in training, e.g. as an early stopping criterion or in model selection) promotes overfitting and the generation of adversarial examples for the Inception model. They thus suggest using IS as an informative metric, moreover, switch to $\log IS$ and fine tune or retrain it for the dataset where the generating model is trained.
 
-#### Frechet Inception Distance (FID)
+#### **Frechet Inception Distance (FID)**
 
 Introduced by [Heusel et al., 2017](https://papers.nips.cc/paper_files/paper/2017/file/8a1d694707eb0fefe65871369074926d-Paper.pdf), FID also uses the Inception v3 model but without the final classification layer producing a 2048 dimensional activation vector. We then apply this both to the generated samples and the data distribution and fit a Gaussians on the resulting datapoints for each (fitting just means taking sample averages and computing empirical covariances) Finally the FID is calculated as the Frechet(Wasserstein-2)-distance of the resulting two normals:
 
@@ -130,13 +134,13 @@ Finally, we mention that while strictly speaking FID only applies to image gener
 
 [Other Generation metrics: TODO]
 
-## III. Unconditioned generation with Diffusions
+## III. Learning and generating unconditioned distribution
 
-After this long introduction, let us finally dive into diffusion models.
+After this long introduction, let us finally dive into diffusion models. In this section, we consider the unconditioned case first where we simply want to learn the data distribution without any further conditioning information. We start by giving an architecture agnostic introduction to the main ideas, most importantly the forward and backward diffusion processes. We then move on to score based generative modeling and show how the two seemingly different approaches are actually different perspectives of the same model family.
 
-### (a) The forward process
+### The forward process
 
-As described above, Diffusion Models learn how to denoise by studying how to noise. The proposal of the seminal paper [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) is to progressively add more and more isotropic Gaussian noise to a training image until the information is nearly destroyed. In particular, the noising is done through a Markov-Chain with a Gaussian transition kernel
+Diffusion Models learn how to denoise by studying how to noise. The proposal of the seminal paper [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) is to progressively add more and more isotropic Gaussian noise to a training image until the information is nearly destroyed. In particular, the noising is done through a Markov-Chain with a Gaussian transition kernel
 
 $$ q(x_t|x_{t-1}) = \mathcal{N}(x_{t-1}, \sqrt{1-\beta_t}, \beta_t I) $$
 
@@ -390,4 +394,4 @@ $$ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar
 
 ## Resources
 
-Besides the references in the text, I took inspiration from [Lilian Wang's blog post](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process) and the Stanford [Deep Generative Models course](https://deepgenerativemodels.github.io/).
+Besides the references in the text, I took inspiration from [Lilian Wang's blog post](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process), the Stanford [Deep Generative Models course](https://deepgenerativemodels.github.io/), and [Yang Song's blogpost](https://yang-song.net/blog/2021/score/)
