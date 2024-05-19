@@ -74,6 +74,8 @@ $$ CE(q \| p) \approx -\frac{1}{N}\sum_{i=1}^N\log p(x_i)$$
 
 where $N$ is the size of the dataset. This, of course, comes at the price that we never know how far from the optimum we are with a particular model.
 
+Drawbacks of likelihood as a metric include that high likelihood models can have arbitrarily terrible generated samples as pointed out in [Theis et al, 2016](https://arxiv.org/pdf/1511.01844) and vica versa.
+
 #### Fisher divergence
 
 In some models, for example ones based on score matching, we cannot tracktably compute the normalization constant and therefore the full probability. In this case, we can resort to computing their scores
@@ -92,18 +94,23 @@ where $p_v$ is a Rademacher (uniform on the vertices of the $D$ dimensional hype
 
 #### Inception Score (IS)
 
-IS, introduced by [Salimans et al., 2016](https://arxiv.org/pdf/1606.03498) to evaluate GAN-s, is a metric that evaluates generation by how well the generated images match the real images in the dataset in terms of their diversity and quality using statistic of the popular Inception v3 deep convolutional network designed for classification tasks on ImageNet. For a given image, it produces a vector of conditional probabilities $p_i(y|x)$ over the thousand Image labels. IS is then defined as
+IS, introduced by [Salimans et al., 2016](https://arxiv.org/pdf/1606.03498) to evaluate GAN-s, is a metric that evaluates generation by how well the generated images match the real images in the dataset in terms of their diversity and quality using statistic of the popular Inception v3 deep convolutional network designed for classification tasks on ImageNet. For a given image, it produces a vector of conditional probabilities $p_i(y|x)$ over the thousand Image labels.
+
+IS is then defined as the exponential of the expected KL divergence between the conditional and the marginal distribution under the generative distribution:
 
 $$ IS = \exp(\mathbb{E}_{x\sim p_{\theta}}D_{KL}(p_{i}(y|x)\|p_i(y))),$$
 
-where $p_i(y) = \mathbb{E}_{x\sim p_\theta}p_i(y|x)$ is the marginal class distribution.
+where $p_i(y) = \mathbb{E}_{x\sim p_\theta}p_i(y|x)$ is the marginal class distribution. To see what this metric is trying to accomplish, note that some easy manipulation shows
 
-The IS scores images on a scale from zero being the worst to theoretically infinity the best with higher being better.
+$$ \log IS = I(y;x) = H(y)-H(y|x),$$
 
-It is using 
+that is, the logarithm of the IS is the mutual information between the class distribution and the generated sample. By the decomposition in the final step, a high IS corresponds to high entropy for the class distribution encouraging diversity, and low entropy for the Inception model's output encouraging clear images with a single object.
+
+[Barratt & Sharma, 2018](https://arxiv.org/pdf/1801.01973) pointed out several weaknesses of this metric, including non-robustness under the Inception model's retraining and its non-transferrability to image datasets other than ImageNet. They also show how optimizing for IS (either in training, e.g. as an early stopping criterion or in model selection) promotes overfitting and the generation of adversarial examples for the Inception model. They thus suggest using IS as an informative metric, moreover, switch to $\log IS$ and fine tune or retrain it for the dataset where the generating model is trained.
 
 #### Frechet Inception Distance (FID)
 
+[TODO]
 
 
 
