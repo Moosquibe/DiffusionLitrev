@@ -146,17 +146,17 @@ Diffusion models, proposed by [Sohl-Dickstein et al (2015)](https://arxiv.org/pd
 
 $$z=(x_1, \cdots, x_T)=:x_{1:T}\in(\mathbb{R}^D)^T.$$
 
-As with other latent variable models, e.g. VAES, the model consist of a prior $p(x_{1:T})$ and a decoder $p(x_0|x_{1:T})$. In the diffusion context the prior is given by a backwards Markov process with an isotropic Gaussian initial distribution $p(x_T)=\mathcal{N}(x_T; 0, I)$ and a parametrized transition function $p_{\theta}(x_t\|x_{t-1})$. The full latent distribution is then given by
+As with other latent variable models, e.g. VAES, the model consist of a prior $p(x_{1:T})$ and a decoder $p(x_0\|x_{1:T})$. In the diffusion context the prior is given by a backwards Markov process with an isotropic Gaussian initial distribution $p(x_T)=\mathcal{N}(x_T; 0, I)$ and a parametrized transition function $p_{\theta}(x_t\|x_{t-1})$. The full latent distribution is then given by
 
 $$ p_{\theta}(x_{1:T}) = p(x_T)\prod_{t=2}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
 
-We also make the Markovian assumption to the decoder $p_\theta(x_0|x_{1:T})=p_{\theta}(x_0|x_1)$ making the marginal probability of the observed variable
+We also make the Markovian assumption to the decoder $p_\theta(x_0\|x_{1:T})=p_{\theta}(x_0\|x_1)$ making the marginal probability of the observed variable
 
 $$ p_\theta(x_0) =\int p_{\theta}(x_0|x_{1:T}) p(x_{1:T})dx_{1:T}= \int p(x_T)\prod_{t=1}^T p_{\theta}(x_{t-1}|x_t)dx_{1:T}. $$
 
 For large $T$, evaluating this high dimensional integral for training naively is hopeless with the exception of the simplest parametrizations of the transition function that allow for analytic computation (but greatly restrict the flexibility of the model). Monte-Carlo sampling comes to the rescue, but doing it naively from the prior would be of extremely high variance, most latent variable values are not compatible with the observed $x_0$ under $p_\theta$.
 
-Instead, one can employ an importance sampling scheme using another distribution $q$ over the trajectories $x_{1:T}$, ideally one that emphasizes plausible latent values given $x_0$. Indeed, we know from VAEs that the ideal one would be the posterior of the latent $p_{\theta}(x_{1:T}|x_0)$. We cannot compute this, however it gives us an idea that we should choose $q$ to be a process starting from the observed sample $x_0$. After making a
+Instead, one can employ an importance sampling scheme using another distribution $q$ over the trajectories $x_{1:T}$, ideally one that emphasizes plausible latent values given $x_0$. Indeed, we know from VAEs that the ideal one would be the posterior of the latent $p_{\theta}(x_{1:T}\|x_0)$. We cannot compute this, however it gives us an idea that we should choose $q$ to be a process starting from the observed sample $x_0$. After making a
 Markovian assumption on $q$ for tractability, we arrive at the importance distribution
 
 $$ q(x_{1:T} | x_0) = \prod_{t=1}^Tq(x_t|x_{t-1}). $$
@@ -167,7 +167,7 @@ $$
 p_{\theta}(x_0) = \int q(x_{1:T}|x_0)p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} dx_{1:T} = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})},
 $$
 
-which can be readily evaluated by sampling trajectories from $q(.|x_0)$ which was chosen to produce plausible latents thereby reduce the variance of the resulting estimator.
+which can be readily evaluated by sampling trajectories from $q(.\|x_0)$ which was chosen to produce plausible latents thereby reduce the variance of the resulting estimator.
 
 ### The forward process
 
@@ -177,7 +177,7 @@ Luckily, a large class of Markov processes converge to their invariant (or stati
 
 $$\int q(x_t|x_{t-1}) \pi(x_{t-1}) = \pi(x_t).$$
 
-irrelevant of the initial value $x_0$. These Markov chains are called ergodic defined by the property $q(x_t|x_0)\approx \pi(x_t)$ for large $t$. The seminal paper [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) proposed $q(x_{t}|x_{t-1})$ to replace some amount of the original signal in $x_{t-1}$ with  Gaussian noise and in the end arrive at $x_T$ being close to the desired isotropic Gaussian. In particular,
+irrelevant of the initial value $x_0$. These Markov chains are called ergodic defined by the property $q(x_t\|x_0)\approx \pi(x_t)$ for large $t$. The seminal paper [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) proposed $q(x_{t}\|x_{t-1})$ to replace some amount of the original signal in $x_{t-1}$ with  Gaussian noise and in the end arrive at $x_T$ being close to the desired isotropic Gaussian. In particular,
 
 $$ q(x_t|x_{t-1}) = \mathcal{N}(x_{t}; \sqrt{1-\beta_t}x_{t-1}, \beta_t I), $$
 
@@ -201,7 +201,7 @@ Here the $\bar{\varepsilon}_t$ are still isotropic standard Gaussians, but they 
 
 For large $t$, as long as $\bar{\alpha}_t\to 0$ (which translates to the $\beta_t$-s not being too small), we have $\bf{x_t} \approx \bar{\varepsilon}_t \sim \mathcal{N}(0, I)$, which can be established rigorously by using e.g. [characteristic functions](https://en.wikipedia.org/wiki/Characteristic_function_(probability_theory)). Furthermore, if the $\beta_t$ are increasing as in most practical implementations, then $\bar{\alpha}_t\leq (1-\beta_1)^t$ and the convergence is exponentially fast.
 
-### **The learning objective I: ELBO**
+### The learning objective I: ELBO
 
 Naturally, we would like the learned model $p_{\theta}(x_0)$ to approximate $q(x_0)$ in KL-divergence which we have seen to be equivalent to minimizing their cross-entropy $CE(q, p_{\theta})$:
 
@@ -215,7 +215,7 @@ where the inner expectation is over the diffusion trajectories with fixed $x_0$ 
 
 $$ \hat{CE}(q, p_\theta) = -\frac{1}{N}\sum_{i=1}^N \log \frac{1}{B}\sum_{b=1}^B\left[p(x_T^{b})\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}^{b}|x_t^{b})}{q(x_t^b|x_{t-1}^b)}\right]$$
 
- Unfortunately, this is potentially heavily biased estimator due to the logarithm (try computing the mean of the estimator, you will get stuck at $\mathbb{E}\log\sum_{samples}$).  
+Unfortunately, this is potentially heavily biased estimator due to the logarithm (try computing the mean of the estimator, you will get stuck at $\mathbb{E}\log\sum_{samples}$).  
 
 Instead, the VAE recipe suggests to use Jensen's inequality to swap the logarithm and the inner expectation and obtain the usual *evidence lower bound (ELBO)* ("lower" refers to the viewpoint of maximizing the likelihood where there are no minus signs and the inequality is flipped):
 
@@ -223,11 +223,11 @@ $$
 -\int q(x_0)\log p_\theta(x_0)dx_0 \leq -\mathbb{E}_{x_{0:T}\sim q}\log \left[p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}\right] =: L
 $$
 
-where the expectation is now taken over the full trajectory $x_{0:T}$. Since Jensens was only applied to the inner expectation, equality will hold if and only if the term under the log is the same for all trajectories $x_{1:T}$. This would imply $q(x_{1:T}|x_0)\propto p_\theta(x_{1:T}, x_0)$ which, after normalization, translates to $q(x_{1:T}|x_0) = p_\theta(x_{1:T}| x_0)$ that is when the distribution of the forward trajectory is exactly the posterior of $x_{1:T}$ under $p_{\theta}$ given $x_0$.
+where the expectation is now taken over the full trajectory $x_{0:T}$. Since Jensens was only applied to the inner expectation, equality will hold if and only if the term under the log is the same for all trajectories $x_{1:T}$. This would imply $q(x_{1:T}\|x_0)\propto p_\theta(x_{1:T}, x_0)$ which, after normalization, translates to $q(x_{1:T}\|x_0) = p_\theta(x_{1:T}\| x_0)$ that is when the distribution of the forward trajectory is exactly the posterior of $x_{1:T}$ under $p_{\theta}$ given $x_0$.
 
 This exact posterior is, of course, no easier to compute than the model probability itself, and VAEs jointly optimize the encoder $q(z\|x)$ and the decoder $p(x\|z)$ to simultaneously close the Jensen-gap and the optimize the bound. For diffusion models, however, the distribution of the forward process is fairly rigidly determined with the $\beta_t$-s being the only (potentially) learnable *variational parameters*. The hope is that the trainable full prior will bring us closer to this fixed $q$ instead.
 
-### **The learning objective II: Sum of KL-divergences**
+### The learning objective II: Sum of KL-divergences
 
 At this point, one could provide the parametrization for $p_{\theta}$, evaluate with Monte-Carlo, take gradients and train as usual. This sampling, however is fairly expensive and it turns out we can do better. Let us first separate the edge terms at $t = 0$ and $t=T$ in $L$:
 
@@ -274,9 +274,9 @@ $$
 \end{align*}
 $$
 
-Let us use the abbreviation $L_T + \sum_{t=1}^{T-1} L_t + L_0$. Then $L_T$ is the KL-divergence between two Gaussians and is usually exponentially small for large $T$ due to the ergodicity of $q(x_t|x_0)$. Again, if the $\beta_t$-s are not trainable then this term has no trainable component and can be dropped.
+Let us use the abbreviation $L_T + \sum_{t=1}^{T-1} L_t + L_0$. Then $L_T$ is the KL-divergence between two Gaussians and is usually exponentially small for large $T$ due to the ergodicity of $q(x_t\|x_0)$. Again, if the $\beta_t$-s are not trainable then this term has no trainable component and can be dropped.
 
-### **Parametrization of the backwards model**
+### Parametrization of the backwards model
 
 $L_t$ is now the KL-divergence between a Gaussian variable and $p_{\theta}(x_{t-1}\| x_t)$. This suggests choosing $p_{\theta}$ to be a Gaussian with mean and variance that are learnable functions of $x_t$:
 
@@ -338,7 +338,7 @@ Other than the weighting factor before the expectation, this says that we want t
 
 We mention that [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) reported better training result by dropping the time dependent pre-factor. This corresponds to the ELBO bound being replaced by a weighted version that emphasizes loss terms corresponding to larger $t$. The authors speculate that this helps because the amount of noise injected is commonly smaller in the early steps so denoising these is an easier task that we do not need to enforce as strong.
 
-### **The decoder**
+### The decoder
 
 [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) derives a discrete decoder $p_{\theta}(x_0\|x_1)$ to obtain valid images assuming that all image data consists of integers in ${0, 1, \dots, 255}$ linearly scaled to $[-1, 1]$.
 
@@ -356,9 +356,9 @@ The effect of this is simply to discretize the probability mass to multiples of 
 
 ### The $\beta_t$ schedule
 
-The $\beta_t$-s are a very important set of parameters of a diffusion model that controls how fast the noise is injected by the forward process. 
+The $\beta_t$-s are a very important set of parameters of a diffusion model that controls how fast the noise is injected by the forward process.
 
-### **Summary**
+### Summary
 
 This was a lot, let us recap. Diffusion models are latent variable models, where the latent variable is given by the trajectory of a backwards Markov Chain $z = x_{T:1}$. Unlike VAE-s, only the distribution of $x_T$ is specified by hand to be an isotropic Gaussian, the rest of the distribution come from a learnable Markov process. To learn this chain by the negative log-likelihood, we do importance sampling with the proposal distribution given by a very simple and tracktable Markov chain starting from $x_0$ and use the ELBO inequality to obtain a tracktable optimization objective. This bound then decomposes into boundary terms $L_T$, $L_0$ and internal terms $L_1,\dots, L_{T-1}$. The internal terms are all KL-divergences between the posterior of the forward transition and the backward transition. If the learnable model has Gaussian transitions, then we can explicitly write this KL-divergence down in terms of the means and variances (after assuming a diagonal covariance structure). If the covariances are isotropic, this will imply an $L^2$ loss on the predicted mean, what's more, suprisingly, we can take this even further when the learning problem becomes learning the noise in the noisy image under $L^2$ loss.
 
@@ -368,9 +368,9 @@ This was a lot, let us recap. Diffusion models are latent variable models, where
 
 Note that we share the neural network $\varepsilon_\theta, it is sufficient for each training step to sample a single timestep. The training loop thus consists of the following steps:
 
-1. Choose a random element $x_0$ of the training set and sample an integer $t$ uniformly between $1$ and $T$.
+1. Choose a random element $x_0$ of the training set and sample an integer $t$ uniformly in $\{1,\dots, T\}$
 2. Sample $\varepsilon\sim \mathcal{N}(0,I)$.
-3. Take gradient descent step on $\nabla_\theta \|\varepsilon - \varepsilon_\theta(\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\varepsilon)\|$.
+3. Take gradient descent step on $\nabla_\theta \\|\varepsilon - \varepsilon_\theta(\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\varepsilon)\\|^2$.
 
 #### **Inference**
 
@@ -406,13 +406,20 @@ $$ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar
 
 While score based learning at first glance is unrelated to diffusion models (and was developed independently), later research uncovered that the connection between the two are much stronger than previously believed. 
 
+[TODO]
+
 ## V. Conditioned generation
 
+While generating images is already lots of fun, the real magic begins when we can guide the generation by a text prompt or other conditioning information.
+
+[TODO]
 
 
 ## VI. Architectures
 
 The presentation so far was architecture agnostic focusing on the learning paradigm. In this section we close this gap by discussing some of the architectural choices that were made in the literature.
+
+[TODO]
 
 ## Resources
 
