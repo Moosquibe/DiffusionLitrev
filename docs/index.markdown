@@ -92,11 +92,11 @@ where $s_p(x;\theta) = \nabla_x\log p_\theta(x)$ is the score of the model distr
 
 $$ J(\theta) = \mathbb{E}_q\left[\mathrm{Tr}(\nabla_x s_p(x; \theta))+\frac{1}{2}\|s_p(x;\theta)\|^2\right] $$
 
-For deep neural network models, the computation of the trace is fairly prohibited since all $D$ diagonal entries have to be computed through backpropagation. [Song et al 2019a](https://arxiv.org/pdf/1905.07088) proposed to mitigate this by comparing random, one dimensional projections of the scores which leads to the *sliced score matching* matching objective:
+For deep neural network models, the computation of the trace is fairly prohibited since all $D$ diagonal entries have to be computed through backpropagation. [Song et al 2019a](https://arxiv.org/pdf/1905.07088) proposed to mitigate this by replacing the full score comparison with comparing random, one dimensional projections which leads to the *sliced score matching* matching objective:
 
 $$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta)v+\frac{1}{2}(v^T s_p(x;\theta))^2\right], $$
 
-where $p_v$ is a Rademacher (uniform on the vertices of the $D$ dimensional hypercube $\{\pm 1\}^D$) or an isotropic stadard normal.
+where $p_v$ is a Rademacher (uniform on the vertices of the $D$ dimensional hypercube $\\{\pm 1\\}^D$) or an isotropic stadard normal.
 
 #### **Inception Score (IS)**
 
@@ -378,7 +378,7 @@ To evaluate the model probability of an unseen example, I believe we still have 
 
 $$ p(x_0) = \mathbb{E}_{x_{1:T}\sim q(\cdot|x_0)}p(x_T)\prod_{t=1}^T\frac{p_{\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})}. $$
 
-and is consequently fairly expensive consisting of the generation of $B$ trajectories and have $B*T$ neural network plus functions-on-top evaluations.
+and is consequently fairly expensive consisting of the generation of $B$ trajectories and have $B\cdot T$ neural network plus functions-on-top evaluations.
 
 1. Generate $B$ simulated trajectories from the forward process.
 2. For each $b = 1,...,B$, and each $t\in 1, \dots T$, evaluate
@@ -404,7 +404,67 @@ $$ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar
 
 ## IV. Score based generative models
 
-While score based learning at first glance is unrelated to diffusion models (and was developed independently), later research uncovered that the connection between the two are much stronger than previously believed. 
+While score based learning at first glance is unrelated to diffusion models (and was developed independently), later research uncovered that the connection between the two are much stronger than previously believed. To help illustrate this, we first cover.
+
+### Score matching
+
+Often identify or estimate the distribution of the date with a statistical model only proportionally $p_{\theta}(x)\propto\tilde{p}_{\theta}(x)$. This means that we get the dependence on $x$ right (up to estimation), however, this is not enough for likelihood based models that require knowledge of the normalization constant (also known as the partition function) making
+
+$$ p_{\theta}(x) = \frac{\tilde p_\theta(x)}{Z_{\theta}}. $$
+
+integrate to one. Clearly, $Z_{\theta} = \int \tilde{p}_\theta(x)dx$, but this integral is often times completely intractable when $x$ is high dimensional even by numerical integration. Approximations can be made but they are often poor and Markov Chain Monte Carlo (MCMC) is either too high variance or impractically slow to be used in maximizing the log-likelihood 
+
+$$ \mathbb{E}_q\log p_{\theta}(x) = \mathbb{E}_q \log \tilde p_\theta(x) - \log Z_\theta $$
+
+where $q$ is again the target distribution the observed data comes from.
+
+[Hyvarinen (2005)](https://jmlr.org/papers/volume6/hyvarinen05a/hyvarinen05a.pdf) demonstrates that naively trying to optimize the unnormalized first term leads to flat probabilities as one way to assign high unnormalized likelihood to the data, when not constrained by normalization, is to assign it to every $x$. Instead the author proposes looking at the Stein score functions, which is the gradient of the log probability and does not depend on the normalization constant:
+
+$$ s_q(x) = \nabla_x\log q(x),\qquad s_{p}(x;\theta) = \nabla_x\log p_{\theta}(x) = \nabla_x\log\tilde p_\theta(x). $$
+
+The model can then be trained by tuning the $\theta$ such that the model and data scores are close. The proposed optimization objective is the Fisher divergence ([LINK TO ABOVE])
+
+$$ J(\theta) = \frac{1}{2}\mathbb{E}_q\|s_p(x; \theta) - s_q(x)\|^2. $$
+
+This is unfortunately not immediately computable since we don't have access to $s_q(x)$ directly. There are multiple solutions here, we look at an exact option now and address the option of adding noise to the data in the next section. 
+
+Remarkably, it turns out that a simple integration by parts trick shows that the Fisher divergence is equivalent to
+
+$$ J(\theta) = \mathbb{E}_q\left[\mathrm{Tr}(\nabla_x s_p(x; \theta))+\frac{1}{2}\|s_p(x;\theta)\|^2\right], $$
+
+which does not involve the score of the data distribution in the expectand and hence can be empirically estimated by sampling from the data. The trade-off is that now have to be able to compute the trace of the Jacobian of the model score (or the Hessian of the log-probability) in the first term. For neural network based models, this can be done through automatic differentiation, but it requires $D$ extra backwards passes.
+
+For training with access to the unnormalized model probabilies, we have to do $D$ forward/backwards passes in $x$ to compute the scores, $D$ more to compute the trace, and then we need a backwards pass with respect to $\theta$ as well. This approach thus only allowed for simple models or for low dimensional problems and was not suitable at scale.
+
+#### **Spliced score matching**
+
+To alleviate this computational burden, [Song et al. (2019)](https://arxiv.org/abs/1905.07088) proposed to replace the full score comparison with comparison of random projections of the score. That is, the objective function is replaced by
+
+$$ J(\theta) = \frac{1}{2}\mathbb{E}_{v\in p_v}\mathbb{E}_q\|v^Ts_p(x; \theta) - v^Ts_q(x)\|^2. $$
+
+where $p_v$ is a simple $D$ dimensional distribution, most likely an isotropic Gaussian or a Rademacher distribution. The same integration by parts trick now leads to
+
+$$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta)v+\frac{1}{2}(v^T s_p(x;\theta))^2\right]. $$
+
+When using Gaussian or Rademacher, the expectation of the second term under $p_v$ can be computed explicitly leading to the reduced variance objective
+
+$$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta)v+\frac{1}{2}\|s_p(x;\theta)\|^2\right]. $$
+
+#### **Denoising score matching**
+
+Another approach starting from the original Fisher divergence is to perturb the empirical data distribution by some Gaussian noise which results in a continuous distribution we can compute the score of.
+
+[TODO]
+
+### Sampling with Langevin Dynamics
+
+[TODO]
+
+### Noise condiditonal score networks
+
+[TODO]
+
+### SDE based
 
 [TODO]
 
@@ -414,10 +474,11 @@ While generating images is already lots of fun, the real magic begins when we ca
 
 [TODO]
 
+## VI. Latent Diffusion models
 
-## VI. Architectures
+## VII. Architectures
 
-The presentation so far was architecture agnostic focusing on the learning paradigm. In this section we close this gap by discussing some of the architectural choices that were made in the literature.
+The presentation so far was architecture agnostic focusing on the learning paradigm, however, the architectures used are crucial to the performance of these models. In this section we close this gap by discussing some of the architectural choices that were made in the literature.
 
 [TODO]
 
