@@ -438,7 +438,7 @@ For training with access to the unnormalized model probabilies, we have to do $D
 
 #### **Spliced score matching**
 
-To alleviate this computational burden, [Song et al. (2019)](https://arxiv.org/abs/1905.07088) proposed to replace the full score comparison with comparison of random projections of the score. That is, the objective function is replaced by
+To alleviate this computational burden, [Song et al. (2019a)](https://arxiv.org/abs/1905.07088) proposed to replace the full score comparison with comparison of random projections of the score. That is, the objective function is replaced by
 
 $$ J(\theta) = \frac{1}{2}\mathbb{E}_{v\in p_v}\mathbb{E}_q\|v^Ts_p(x; \theta) - v^Ts_q(x)\|^2. $$
 
@@ -452,15 +452,49 @@ $$ J(\theta) = \mathbb{E}_{v\sim p_v}\mathbb{E}_q\left[v^T\nabla_x s_p(x; \theta
 
 #### **Denoising score matching**
 
-Another approach starting from the original Fisher divergence is to perturb the empirical data distribution by some Gaussian noise which results in a continuous distribution we can compute the score of.
+Another approach starting from the original Fisher divergence was put forward by [Vincent (2011)](https://www.iro.umontreal.ca/~vincentp/Publications/smdae_techreport.pdf) inspired by Denoising Autoencoders where the autoencoder has to reconstruct the original input from a noise-perturbed one. He suggested to perturb the empirical data distribution by some Gaussian noise that is the target distribution for a datapoint $x$ gets spread out according to
 
-[TODO]
+$$ q_\sigma(\tilde x | x) = \mathcal{N}(\tilde x; x, \sigma^2 I). $$
+
+The joint distribution is given by $ q_\sigma(x,\tilde x) = q_{\sigma}(\tilde x \| x) q(x)$ and the score matching objective becomes
+
+$$ \frac{1}{2}\mathbb{E}_{(x,\tilde x)\sim q_{\sigma}(x, \tilde x)}\|s_p(\tilde x, \theta) - \nabla_{\tilde x}\log q(\tilde x | x)\|^2. $$
+
+That is, the score model is learning the perturbed distribution. In exchange, however, we can compute the target score since
+
+$$ \nabla_{\tilde x}\log q(\tilde x | x) = \frac{x - \tilde x}{\sigma^2}$$
+
+which points towards the direction of the clean data.
 
 ### Sampling with Langevin Dynamics
 
-[TODO]
+No matter how we learned the score model, we want to use it to genrate samples from it. Luckily, inspired by 19th century physics, [Welling & Teh, 2011](https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf) proposed just the right tool
 
-### Noise condiditonal score networks
+$$ \tilde x_t = \tilde x_{t-1} + \frac{\delta}{2}\nabla_x\log p_\theta(\tilde x_{t-1}) + \sqrt{\delta}\varepsilon_t,\qquad \varepsilon_t\sim\mathcal{N}(0, I) $$
+
+This problem can be thought of as a noise perturbed gradient descent on the log probability and clearly it only needs information on the model score. Note that $x_{t\delta} = \tilde x_{t}$ is a simple Euler-Maruyama discretization scheme of the Stochastic Differential Equation (SDE)
+
+$$ dx_t = \frac{1}{2}\nabla_x\log p_\theta(x_t) + dw_t $$
+
+with [has stationary distribution](https://math.stackexchange.com/questions/4200043/langevin-equation-and-convergence-to-stationary-solutions-free-energy-sde-fpe) $p_{\theta}(x)$ to which $p(x_t)$ converges to as $t\to\infty$. This means that if $\delta$ is small and $T$ is large, then $\tilde x_T$ will be approximately distributed according to $p_\theta(x)$ which we can leverage to generate samples. For finite $\delta$ and $T$ we could apply Metropolis-Hastings corrections, but we will not pursue this here.
+
+[Song et al. (2019b)](https://arxiv.org/pdf/1907.05600) pointed out two serious challenges. We have already addressed the first which is the difficulty in gradient estimation in the ambient space when the data lives on a lower dimensional manifold and discussed how denoising score matching can help. The second one is that low data density regions (where a randomly initialized process will most likely start) both impair score estimation and slow down the mixing of Langevin dynamics as the process will get trapped in the modes of the distribution with only rare transitions in between.
+
+### Noise condiditonal score networks (NCSN)
+
+To mitigate these problems, [Song et al. (2019b)](https://arxiv.org/pdf/1907.05600) proposed an annealing Langevin process where choose $L$ noise levels $\sigma_1 > \dots > \sigma_L$ and at each level perturbs the data with a corresponding isotropic Gaussian as in denoising score matching. They then put forward training a joint network $s_p(x, t;\theta)$ by minimizing the objective
+
+$$ \frac{1}{L}\sum_{i=1}^L\lambda(\sigma_i) l(\theta,\sigma_i), $$
+
+where noise level loss $l(\theta,\sigma_i)$ is defined by
+
+$$
+\frac{1}{2}\mathbb{E}_{x\sim q}\mathbb{E}_{\tilde x\sim\mathcal{N}(x, \sigma_i)}\left\|s_{\theta}(\tilde x, \sigma_i)+ \frac{\tilde x -x}{\sigma^2} \right\|^2
+$$
+
+The function $\lambda(.)$ is chosen so that the different terms are roughly of the same magnitude. [Song et al. (2019b)](https://arxiv.org/pdf/1907.05600) reported finding $\lambda(\sigma) = \sigma^2$ to be a good choice.
+
+To do inference from this model, the Langevin sampling will be done in an annealed fashion chaining together Langevin steps with decreasing noise size. At noise size $\sigma_i$, we will use the step size $\delta_i=\delta\frac{\sigma_i^2}{\sigma_L^2}$ where $\delta$ is the stepsize for the lowest noise level. This choice was found to be the right one to balance the Signal to Noise Ratio (SNR) given by the ratio of the deterministic and the noise term in the process. Finally, the proposed choice for the noise levels is that they follow a geometric progression $\sigma_i = \sigma_1 c^i$ for some $c\in (0, 1)$.
 
 [TODO]
 
