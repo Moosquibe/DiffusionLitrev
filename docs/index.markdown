@@ -42,17 +42,19 @@ There is a rich variety of models that can be utilized for the generative learni
 
     - **Autoregressive models**, e.g. most LLM-s, that factorizes the probability into the product of conditional probabilities according to some sometimes natural, sometimes arbitrary ordering: $p(x)=\prod_ip(x_i\|x_{<i})$. The model then learns these conditional distributions (and some seeding distribution for $x_0$). This structure makes the evaluation of the likelihood easy, but the generation has to be sequential which can be very slow.
     - **Variational Autoencoders (VAE)**, are latent variable models with a training methodology that jointly learns (1) what latent values are plausible for a given observation (encoder) and (2) how to decode a given value of the latent into a distribution over possible data domain instances. It does this to simultaneously optimize a surrogate loss function and close the gap between this surrogate and the likelihood.
-    - **Normalizing flow models** that learn invertible deterministic mappings between the latent space and the observation domain and uses it to transform the latent densities to densities in the data domain. Needless to say, the invertibility puts a fair amount of restriction of the architecture of this mapping has been restricted to continuous distributions.
-    - **Energy based models** [TODO]
+    - **Normalizing flow models** that learn invertible deterministic mappings between the latent space and the observation domain and uses it to transform the latent densities to densities in the data domain. This allows computation of the likelihood through the simple prior distribution for the latent but needless to say, the invertibility puts a fair amount of restriction of the architecture of this mapping is restricting to continuous distributions.
+    - **Energy based models** model the logarithm of the unnormalized likelihood $E_\theta(x)$ in $p_{\theta}(x) = Z_\theta^{-1}\exp E_\theta(x)$ and work around the limitations of the unknown normalization constant by contrastive learning techniques that basically all boil down to pushing $E_{\theta}(x)$ up on data samples and push down on contrasting negative samples without collapsing the energy landscape.
     - **Diffusion models** that are latent variable models, however, the latent is the path of a diffusion process and the prior latent distribution is both learnable. They can also be viewed as stochastic flows or stacked VAE-s and use a similar surrogate objective approach. They are the subject of this survey and we will go into the topic in much more detail below.
 
-2. **Implicit generative models** where the probability distribution is implicitly represented by its sampling process but without a tracktable density/mass function. They often require adversarial training which is notoriously unstable and often leads to model collapse.
+2. **Implicit generative models** where the probability distribution is implicitly represented by its sampling process but without a tracktable density/mass function.
 
-   - **Generative Adversarial Networks (GAN)**, the state of the art for quite some time, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart. They have excellent generation properties but are notoriously hard to train.
+   - **Generative Adversarial Networks (GAN)**, the state of the art for quite some time, where a generator model is trained to fool a discriminator model which is trained to tell generated and real images apart. They have excellent generation properties and were the state of the art in sample quality for quite a while generating lots of research interest (see the [GAN Zoo](https://github.com/hindupuravinash/the-gan-zoo)).
+   
+        On the other hand they are notoriously hard to train due to the nature of the min-max adversarial training. Indeed, they look for a good saddle point instead of an optimum and the objective function thus oscillates heavily. Often either the generator or the discriminator simply "wins" (model collapse), or the model start oscillating between modes of the data distribution (mode collapse) and the training fails. There is a large [bag of tricks](https://github.com/soumith/ganhacks) employed in practice. These difficulties eventually caused them to mostly fall out of the mainstream in favor of diffusion models.
 
 3. **Score based generative models** that circumvents the difficulties of estimating the normalization constant by instead modeling the gradient of the log-probability often referred to as the Stein score. This is a vector field pointing towards increasing log-probability and can be learned by a model through a procedure called score matching. This vector field can also be used to guide a randomized process called Langevin dynamics to extract samples.
 
-They have achieved state of the art performance at the time on many tasks and later it was discovered that they are very tightly related to Diffusion Processes in that both can be viewed as discretization of Stochastic Differential Equations (SDE) driven by score functions.
+They have achieved state of the art performance at the time on many tasks and later it was discovered that they are very tightly related to diffusion models in that both can be viewed as discretization of Stochastic Differential Equations (SDE) driven by score functions. In short, diffusion models and score based models turned out to be two viewpoints of the same thing.
 
 ### Evaluating generative models
 
@@ -112,7 +114,7 @@ $$ \log IS = I(y;x) = H(y)-H(y|x),$$
 
 that is, the logarithm of the IS is the mutual information between the class distribution and the generated sample. By the decomposition in the final step, a high IS corresponds to high entropy for the class distribution encouraging diversity, and low entropy for the Inception model's output encouraging clear images with a single object.
 
-[Barratt & Sharma, 2018](https://arxiv.org/pdf/1801.01973) pointed out several weaknesses of this metric, including non-robustness under the Inception model's retraining and its non-transferrability to image datasets other than ImageNet. They also show how optimizing for IS (either in training, e.g. as an early stopping criterion or in model selection) promotes overfitting and the generation of adversarial examples for the Inception model. They thus suggest using IS as an informative metric, moreover, switch to $\log IS$ and fine tune or retrain it for the dataset where the generating model is trained.
+Besides the obvious limitation to labeled dataset, [Barratt & Sharma, 2018](https://arxiv.org/pdf/1801.01973) pointed out several weaknesses of this metric, including non-robustness under the Inception model's retraining and its non-transferrability to image datasets other than ImageNet. They also show how optimizing for IS (either in training, e.g. as an early stopping criterion or in model selection) promotes overfitting and the generation of adversarial examples for the Inception model. They thus suggest using IS as an informative metric, moreover, switch to $\log IS$ and fine tune or retrain it for the dataset where the generating model is trained.
 
 #### **Frechet Inception Distance (FID)**
 
@@ -132,9 +134,15 @@ Unfortunately FID, suffers from many of the same limitations of IS and care shou
 
 Finally, we mention that while strictly speaking FID only applies to image generation, [Unterthiner et. al, 2019](https://openreview.net/pdf?id=rylgEULtdN) proposed versions (FVD) for video generation by replacing Inception v3 with a network that considers the temporal coherence of the visual content across a sequence of frames as well. Similarly, [Kilgour et al., 2019](https://arxiv.org/pdf/1812.08466) proposed a variant (FAD) that is suitable for models generating audio.
 
-[Other Generation metrics? TODO]
+#### **Precision and Recall**
 
-## III. Learning and generating unconditioned distributions with diffusion models
+A major shortcoming of the above single dimensional metrics is that they cannot distinguish between different failure modes. In particular, they don't distinguish between diversity/coverage and realism of the samples. Introduced in it's earlier form by [Lucic et al. (2028)](https://arxiv.org/pdf/1711.10337), *precision* and *recall* attempts to fill this gap. Intuitively, precision measures the quality of samples from $p_\theta$ while recall indicates the proportion of $q$ covered by $p_\theta$. [Sajjadi et al. (2018)](https://arxiv.org/pdf/1806.00035) proposed a computable notion of precision and recall
+
+improved by [Kynkäänniemi et al. (2019)](https://arxiv.org/pdf/1904.06991)...
+
+[TODO]
+
+## III. Learning and generating from unconditioned distributions with diffusion models
 
 After this long introduction, let us finally dive into diffusion models. In this section, we consider the unconditioned case first where we simply want to learn the data distribution without any further conditioning information. We start by giving an architecture agnostic introduction to the main ideas, namely the backward and forward diffusion processes. We then move on to score based generative modeling and show how the two seemingly different approaches are actually different perspectives of the same model family.
 
@@ -197,7 +205,7 @@ which allows us to unfold the forward process to
 
 $$ {\bf x}_t = \sqrt{\bar{\alpha}_t}{\bf x}_0 + \sqrt{1-\bar{\alpha}_t}\bar{\varepsilon}_t. $$
 
-Here the $\bar{\varepsilon}_t$ are still isotropic standard Gaussians, but they are not independent anymore for different $t$. The reader is invited to prove this by induction. 
+Here the $\bar{\varepsilon}_t$ are still isotropic standard Gaussians, but they are not independent anymore for different $t$. The reader is invited to prove this by induction.
 
 For large $t$, as long as $\bar{\alpha}_t\to 0$ (which translates to the $\beta_t$-s not being too small), we have $\bf{x_t} \approx \bar{\varepsilon}_t \sim \mathcal{N}(0, I)$, which can be established rigorously by using e.g. [characteristic functions](https://en.wikipedia.org/wiki/Characteristic_function_(probability_theory)). Furthermore, if the $\beta_t$ are increasing as in most practical implementations, then $\bar{\alpha}_t\leq (1-\beta_1)^t$ and the convergence is exponentially fast.
 
@@ -319,7 +327,7 @@ Since the covariance matrix of the forward transition is diagonal, it is reasona
 
 $$ L_t = \frac{1}{2}\mathbb{E}_{x_0, x_t \sim q}\sum_i\left[ \frac{\tilde{\beta}_t + (\mu_{\theta}^i(x_t, t)-\tilde\mu^i(x_t, x_0))^2}{\Sigma_{\theta}^{ii}(x_t, t)} - \sum_i\log\Sigma_{\theta}^{ii}(x_t, t) - 1\right] + \frac{D(\log\tilde\beta_t -1)}{2}$$
 
-This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively ends it. They set $(\mu_{\theta}(x_t, t), \sigma_{\theta}(x_t, t))$ to be a Neural Network (see below for architectures) and learn them together $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, this approach ends up with 
+This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively puts down the pen. They set $(\mu_{\theta}(x_t, t), \sigma_{\theta}(x_t, t))$ to be a Neural Network (see below for architectures) and learn them together $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, this approach ends up with 
 
 $$ L_t = \frac{1}{2\sigma_t^2}\mathbb{E}_{x_0, \bar\varepsilon_t}\|\tilde\mu(x_t, \bar\varepsilon_t) - \mu_{\theta}(x_t, t)\|^2 $$
 
@@ -336,7 +344,11 @@ $$
 
 Other than the weighting factor before the expectation, this says that we want to use a neural network to learn $\varepsilon_\theta$ which takes a noisy image as input and an index of what stage of the denoising we are in and predicts the noise that was added to the original image.
 
-We mention that [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) reported better training result by dropping the time dependent pre-factor. This corresponds to the ELBO bound being replaced by a weighted version that emphasizes loss terms corresponding to larger $t$. The authors speculate that this helps because the amount of noise injected is commonly smaller in the early steps so denoising these is an easier task that we do not need to enforce as strong.
+We mention that [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) reported better training result by dropping the time dependent pre-factor and using
+
+$$ L_{simple, t}(\theta) = \mathbb{E}_{x_0, \bar\varepsilon_t}\|\bar\varepsilon_t - \epsilon_{\theta}(\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\bar\varepsilon_t,t)\|^2. $$
+
+This corresponds to the ELBO bound being replaced by a weighted version that emphasizes loss terms corresponding to larger $t$. The authors speculate that this helps because the amount of noise injected is commonly smaller in the early steps so denoising these is an easier task that we do not need to enforce as strong.
 
 ### The decoder
 
@@ -354,13 +366,38 @@ x\pm\frac{1}{255}&\textrm{if}~\pm x < 1
 $$
 The effect of this is simply to discretize the probability mass to multiples of $1/255$ to define actual images.
 
-### The $\beta_t$ schedule
+### The $\beta_t$ noise schedule
 
-The $\beta_t$-s are a very important set of parameters of a diffusion model that controls how fast the noise is injected by the forward process.
+The $\beta_t$-s are a very important set of parameters of a diffusion model that controls how fast the noise is injected by the forward process. [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) proposed to learn them, while [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) treated them as hyperparameter, increasing linearly from $\beta_1=10^{-4}$ to $\beta_T=0.02$ remaining relatively small compared to normalize image pixel values.
 
-### Summary
+[Nichol & Dariwal (2021)](https://arxiv.org/pdf/2102.09672) argued that the linear schedule is too eager to destroy the data and proposed a slower schedule while keeping the property of $\alpha_t$ having a linear drop in the middle of the range and being flat at both ends. Namely,
 
-This was a lot, let us recap. Diffusion models are latent variable models, where the latent variable is given by the trajectory of a backwards Markov Chain $z = x_{T:1}$. Unlike VAE-s, only the distribution of $x_T$ is specified by hand to be an isotropic Gaussian, the rest of the distribution come from a learnable Markov process. To learn this chain by the negative log-likelihood, we do importance sampling with the proposal distribution given by a very simple and tracktable Markov chain starting from $x_0$ and use the ELBO inequality to obtain a tracktable optimization objective. This bound then decomposes into boundary terms $L_T$, $L_0$ and internal terms $L_1,\dots, L_{T-1}$. The internal terms are all KL-divergences between the posterior of the forward transition and the backward transition. If the learnable model has Gaussian transitions, then we can explicitly write this KL-divergence down in terms of the means and variances (after assuming a diagonal covariance structure). If the covariances are isotropic, this will imply an $L^2$ loss on the predicted mean, what's more, suprisingly, we can take this even further when the learning problem becomes learning the noise in the noisy image under $L^2$ loss.
+$$ \alpha_t = \frac{f(t)}{f(0)}, \qquad f(t) = \cos\left(\frac{t/T +s}{1+s}\frac{\pi}{2}\right)^2 $$
+
+and then $\beta_t=1-\frac{\bar\alpha_t}{\bar\alpha_{t-1}}$ clipping it to be less then $1-\delta$ for some very small $\delta$. This is done to avoid total destruction at $t=T$ and similarly, the offset $s$ is introduced so that $\beta_t$ is not too small.
+
+The number of steps should be chosen to make $L_T$ negligibly small. In practice, $T$ being a couple of thousand has been a standard choice.
+
+### The reverse process variance $\Sigma_\theta$
+
+There are multiple possible options here as well, [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) proposed learning a diagonal but otherwise unconstrained covariance matrix. [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) empirically argued that this leads to poorer sample quality and unstable training due to the small reasonable range for its magnitude in $[\beta_t, \tilde\beta_t]$. Instead, they decided to fix it to $\sigma_t^2I$ where $\sigma_t$ is either set to $\beta_t$ or $\tilde{\beta}_t$ reporting similar performance for both choices.
+
+[Nichol & Dariwal (2021)](https://arxiv.org/pdf/2102.09672) showed that $\beta_t$ and $\tilde\beta_t$ are very similar with the exception of small $t$-s that happen to also contribute the most to the overall loss $L_{simple}=\sum_{t=0}^TL_{simple, t}$. They thus propose to return to learning $\Sigma_\theta(x_t, t)$ but with a special parametratization to avoid the training instability. Namely, the model learns an extra vector $v\in\mathbb{R}^D$ and use it to interpolate between $\beta_t$ and $\tilde\beta_t$ componentwise:
+
+$$ \Sigma_\theta(x_t,t) = e^{v\log\beta_t + (1-v)\log\tilde\beta} $$
+
+Since $L_{simple}$ contains no signal for the variances, they proposed a hybrid objective
+
+$$L_{hybrid, t} = L_{simple, t} + \lambda L_t, $$
+
+where $L_t$ is the original unweighted ELBO loss with a stop gradient on the $\mu$ output.
+
+Nevertheless, they still found the gradients of $L_t$ to be very noisy and in light of the differences in $L_t$ magnitudes for different $t$, proposed a modification to the selection of $t$ in the training algorithm above. Namely, they proposed to sample $t$ with an importance sampling scheme:
+
+$$\hat{L}_t = \mathbb{E}_{t\sim p_t}\left[\frac{L_t}{p_t}\right] $$
+
+where $p_t\propto\sqrt{\mathrm{E}L_t}$ is estimated by a moving average of $L_t$ with an initial uniform selection phase until we obtain enough sample for each (this is akin to a multi-armed bandit).
+
 
 ### Training, Inference, Sampling
 
@@ -401,6 +438,10 @@ Sampling is ever so slightly simpler as we only need to go through a single back
 $$ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\varepsilon_{\theta}(x_t, t)\right) + \sigma_t z $$
 
 3. Output $\mu_{\theta}(x_1, 1)$.
+
+### Summary
+
+This was a lot, let us recap. Diffusion models are latent variable models, where the latent variable is given by the trajectory of a backwards Markov Chain $z = x_{T:1}$. Unlike VAE-s, only the distribution of $x_T$ is specified by hand to be an isotropic Gaussian, the rest of the distribution come from a learnable Markov process. To learn this chain by the negative log-likelihood, we do importance sampling with the proposal distribution given by a very simple and tracktable Markov chain starting from $x_0$ and use the ELBO inequality to obtain a tracktable optimization objective. This bound then decomposes into boundary terms $L_T$, $L_0$ and internal terms $L_1,\dots, L_{T-1}$. The internal terms are all KL-divergences between the posterior of the forward transition and the backward transition. If the learnable model has Gaussian transitions, then we can explicitly write this KL-divergence down in terms of the means and variances (after assuming a diagonal covariance structure). If the covariances are isotropic, this will imply an $L^2$ loss on the predicted mean, what's more, suprisingly, we can take this even further when the learning problem becomes learning the noise in the noisy image under $L^2$ loss.
 
 ## IV. Score based generative models
 
@@ -496,9 +537,25 @@ The function $\lambda(.)$ is chosen so that the different terms are roughly of t
 
 To do inference from this model, the Langevin sampling will be done in an annealed fashion chaining together Langevin steps with decreasing noise size. At noise size $\sigma_i$, we will use the step size $\delta_i=\delta\frac{\sigma_i^2}{\sigma_L^2}$ where $\delta$ is the stepsize for the lowest noise level. This choice was found to be the right one to balance the Signal to Noise Ratio (SNR) given by the ratio of the deterministic and the noise term in the process. Finally, the proposed choice for the noise levels is that they follow a geometric progression $\sigma_i = \sigma_1 c^i$ for some $c\in (0, 1)$.
 
-[TODO]
+Finally, we mention that this initial setup worked well for 32x32 images but fell apart for larger resolution. Several improvements were proposed by [Song & Ermon (2020)](https://arxiv.org/pdf/2006.09011) unlocking scalability to higher resolution images that we do not detail here.
 
-### SDE based
+### Connection to diffusion models
+
+There is a striking similarity between how both NCSN and Diffusion models use a hierarchical scale of adding more and more noise to the original data and then generate using a Markov process starting from noise. To see an even deeper connection, we proceed as follows. If we make the identification between the noise level $i$ and the diffusion step $t$, the score of the data produced by the forward process is
+
+$$
+s_q(x_t, t)\approx \nabla_{x_t}\log q(x_t|x_0) = -\frac{x_t-\sqrt{\alpha_t}x_0}{1-\bar\alpha_t} = -\frac{\bar\varepsilon_t}{\sqrt{1-\bar\alpha_t}},
+$$
+
+where we used that $q(x_t|x_0)$ is a Gaussian and the definition of $\bar\varepsilon_t$. With a simple rescaling of our score model, we also have
+
+$$ s_p(x_t, t; \theta) = - \frac{\varepsilon_\theta(x_t, t)}{\sqrt{1-\alpha_t}}, $$
+
+and our diffusion model objective is equivalent to score matching at each step of the diffusion.
+
+### Deeper connection with Diffusions: Discretization of an SDE
+
+[Song et al. (2021)](https://openreview.net/pdf?id=PxTIG12RRHS) ...
 
 [TODO]
 
@@ -508,9 +565,16 @@ While generating images is already lots of fun, the real magic begins when we ca
 
 [TODO]
 
-## VI. Latent Diffusion models
+## VI. Speeding up generation
 
-## VII. Architectures
+[Song et al. (2022)](https://arxiv.org/pdf/2010.02502) then
+
+[Nichol & Dhariwal (2021a)]
+
+
+## VII. Latent Diffusion models
+
+## VIII. Architectures
 
 The presentation so far was architecture agnostic focusing on the learning paradigm, however, the architectures used are crucial to the performance of these models. In this section we close this gap by discussing some of the architectural choices that were made in the literature.
 
