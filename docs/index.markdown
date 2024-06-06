@@ -152,7 +152,14 @@ They proceed by taking a balanced sample from real and generated images and embe
 
 $$ P(\Phi_r, \Phi_g) = \frac{1}{|\Phi_g|}\sum_{\phi_g\in\Phi_g}f(\phi_g, \Phi_r), \qquad R(\Phi_r, \Phi_g) = \frac{1}{|\Phi_r|}\sum_{\phi_r\in\Phi_r}f(\phi_r, \Phi_g).$$
 
-That is, precision is the proportion of generated images contained in the real target manifold, while recall is the proportion of real images that are located in the generated manifold. As to the choice of the number of neighbors, the authors found that $k=3$ is a good choice.
+That is, precision is the proportion of generated images contained in the real target manifold, while recall is the proportion of real images that are located in the generated manifold. As to the choice of the number of neighbors, the authors found that $k=3$ is a good choice also suggesting to evaluate on 50k images as it became standard for FID.
+
+We remark that a soft version of the binary function $f$ can be used as the realism score of the individual image:
+
+$$ Real(\phi_g,\Phi_r) = \max_{\phi_r}\frac{\|\phi_r-NN_k(\phi_r, \Phi_r)\|_2}{\|\phi_g-\phi_r\|}, $$
+
+where the maximum is taken after discarding the 50% largest spheres. The reason for this is to mitigate the effect of sparse
+data regions where the $k$th nearest neighbor may be quite far.
 
 ## III. Learning and generating from unconditioned distributions with diffusion models
 
@@ -339,7 +346,7 @@ Since the covariance matrix of the forward transition is diagonal, it is reasona
 
 $$ L_t = \frac{1}{2}\mathbb{E}_{x_0, x_t \sim q}\sum_i\left[ \frac{\tilde{\beta}_t + (\mu_{\theta}^i(x_t, t)-\tilde\mu^i(x_t, x_0))^2}{\Sigma_{\theta}^{ii}(x_t, t)} - \sum_i\log\Sigma_{\theta}^{ii}(x_t, t) - 1\right] + \frac{D(\log\tilde\beta_t -1)}{2}$$
 
-This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively puts down the pen. They set $(\mu_{\theta}(x_t, t), \sigma_{\theta}(x_t, t))$ to be a Neural Network (see below for architectures) and learn them together $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, this approach ends up with 
+This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively puts down the pen. They set $(\mu_{\theta}(x_t, t), \Sigma_{\theta}(x_t, t))$ to be the output of a Neural Network (see below for architectures) and learn them together with $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, this approach ends up with 
 
 $$ L_t = \frac{1}{2\sigma_t^2}\mathbb{E}_{x_0, \bar\varepsilon_t}\|\tilde\mu(x_t, \bar\varepsilon_t) - \mu_{\theta}(x_t, t)\|^2 $$
 
@@ -384,7 +391,7 @@ The $\beta_t$-s are a very important set of parameters of a diffusion model that
 
 [Nichol & Dariwal (2021)](https://arxiv.org/pdf/2102.09672) argued that the linear schedule is too eager to destroy the data and proposed a slower schedule while keeping the property of $\alpha_t$ having a linear drop in the middle of the range and being flat at both ends. Namely,
 
-$$ \bar alpha_t = \frac{f(t)}{f(0)}, \qquad f(t) = \cos\left(\frac{t/T +s}{1+s}\frac{\pi}{2}\right)^2 $$
+$$ \bar \alpha_t = \frac{f(t)}{f(0)}, \qquad f(t) = \cos\left(\frac{t/T +s}{1+s}\frac{\pi}{2}\right)^2 $$
 
 and then $\beta_t=1-\frac{\bar\alpha_t}{\bar\alpha_{t-1}}$ clipping it to be less then $1-\delta$ for some very small $\delta$. This is done to avoid total destruction at $t=T$ and similarly, the offset $s$ is introduced so that $\beta_t$ is not too small.
 
@@ -509,7 +516,7 @@ Another approach starting from the original Fisher divergence was put forward by
 
 $$ q_\sigma(\tilde x | x) = \mathcal{N}(\tilde x; x, \sigma^2 I). $$
 
-The joint distribution is given by $ q_\sigma(x,\tilde x) = q_{\sigma}(\tilde x \| x) q(x)$ and the score matching objective becomes
+The joint distribution is given by $ q_\sigma(x,\tilde x) = q_{\sigma}(\tilde x \| x) q(x)$ and after noting $\nabla_{\tilde x}\log q_\sigma(\tilde x, x) = \nabla_{\tilde x}\log q(\tilde x \| x)$, the score matching objective becomes
 
 $$ \frac{1}{2}\mathbb{E}_{(x,\tilde x)\sim q_{\sigma}(x, \tilde x)}\|s_p(\tilde x, \theta) - \nabla_{\tilde x}\log q(\tilde x | x)\|^2. $$
 
@@ -553,21 +560,48 @@ Finally, we mention that this initial setup worked well for 32x32 images but fel
 
 ### Connection to diffusion models
 
-There is a striking similarity between how both NCSN and Diffusion models use a hierarchical scale of adding more and more noise to the original data and then generate using a Markov process starting from noise. To see an even deeper connection, we proceed as follows. If we make the identification between the noise level $i$ and the diffusion step $t$, the score of the data produced by the forward process is
+There is a striking similarity between how both NCSN and Diffusion models use a hierarchical scale of adding more and more noise to the original data and then generate using a Markov process starting from noise. To see an even deeper connection, we proceed as follows. If we make the identification between the noise level $i$ and the diffusion step $t$, the score of the data produced by the forward diffusion process is
 
 $$
 s_q(x_t, t)\approx \nabla_{x_t}\log q(x_t|x_0) = -\frac{x_t-\sqrt{\alpha_t}x_0}{1-\bar\alpha_t} = -\frac{\bar\varepsilon_t}{\sqrt{1-\bar\alpha_t}},
 $$
 
-where we used that $q(x_t|x_0)$ is a Gaussian and the definition of $\bar\varepsilon_t$. With a simple rescaling of our score model, we also have
+where we used that $q(x_t|x_0)$ is a Gaussian and the definition of $\bar\varepsilon_t$. With a simple rescaling of our noise model, we can also define
 
 $$ s_p(x_t, t; \theta) = - \frac{\varepsilon_\theta(x_t, t)}{\sqrt{1-\alpha_t}}, $$
 
-and our diffusion model objective is equivalent to score matching at each step of the diffusion.
+and the diffusion model objective for each $t$ is simply a rescaled version of the corresponding score matching objective after identifying $\tilde x = x_t$.
 
-### Deeper connection with Diffusions: Discretization of an SDE
+### Deeper connection with Diffusions: Discretization of SDE noising schemes
 
-[Song et al. (2021)](https://openreview.net/pdf?id=PxTIG12RRHS) ...
+[Song et al. (2021)](https://openreview.net/pdf?id=PxTIG12RRHS) showed that both DDPM and NCSN are discretizations of a corresponding Stochastic Differential Equation (SDE). Starting with the NCSN, note that the data perturbation of the noise level $i$, $q_{\sigma_i}(x_i | x_0)$ is the marginal distribution of a Markov chain
+
+$$ x_i = x_{i-1} + \sqrt{\sigma_i^2-\sigma_{i-1}^2}z_{i-1}, \qquad z_{i-1}\sim\mathcal{N}(0, I), \qquad t = 1,\dots, N $$
+
+where we define $\sigma_0=0$. If we define a continuous time process $x: [0,T]\to\mathbb{R}^D$ by $x(i/N) = x_i$, and $\sigma:[0, T]\to \mathbb{R}$ by  $\sigma(i/N) = \sigma_i$ with linear interpolation, then the Markov chain can be written as
+
+$$x(t+\Delta t) = x(t) + \sqrt{\sigma^2(t+\Delta t)-\sigma^2(t)}z(t),$$
+
+where we also introduced $z(t) = z(i/N)$ and $\Delta t = 1/N$. Thus, the process $x(t)$ converges in distribution to the solution of the SDE
+
+$$ dx = \sqrt{\frac{d[\sigma^2(t)]}{dt}}dw.$$
+
+The variance at time $t$ can be easily seen to be $\sigma^2(t)$ (ignoring the variance of $x_0$) using the Ito-isometry and thus this is called a variance exploding VE-SDE, since $\sigma^2(t)$ usually increases with $t$. We emphasize however that there is no finite time blow-up.
+
+
+
+
+More precisely, they both perturb the data with multiple noise scales, which can be taken to the extreme when the noising process is described by a time dependent SDE:
+
+$$
+dx = f(x, t)dt + g(t)dW(t),\qquad x(0) = x_0
+$$
+
+where we would like the distribution of $x_T$, denoted by $p_T(x)$ to be an unstructure prior, most notably an isotropic Gaussian. Not every SDE will acheive this but a large class of them do. The remarkable fact is that the reverse of such a process is also described by an SDE that goes backwards in time and contains the score function of the forward SDE solution:
+
+$$
+dx = \left[f(x,t) - g^2(t)\nabla_x\log p_t(x)\right]dt + g(t)d\hat{W}
+$$
 
 [TODO]
 
