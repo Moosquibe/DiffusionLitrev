@@ -30,14 +30,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "datasets",
-    srcs = ["srcs/datasets/load.py"]
-    deps = [
-        requirement("torchvision")
-    ]
-)
-
 compile_pip_requirements(
     name = "requirements",
     src = "requirements.in",

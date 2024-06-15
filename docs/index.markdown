@@ -336,15 +336,15 @@ Putting it together, $q(x_{t-1}\|x_t, x_0) = \mathcal{N}(x_{t-1}; \tilde\mu(x_t,
 
 To compute the KL-divergence of two normals, we can use the well known formula
 
-$$ D_{KL}(\mathcal{N}_1, \mathcal{N}_2) = \frac{1}{2}\left[\mathrm{Tr}(\Sigma_2^{-1}\Sigma_1) - D + (\mu_2 -\mu_1)\Sigma_2^{-1}(\mu_2 -\mu_1) + \log\frac{\mathrm{det}\Sigma_1}{\mathrm{det}\Sigma_2}\right]$$
+$$ D_{KL}(\mathcal{N}_1, \mathcal{N}_2) = \frac{1}{2}\left[\mathrm{Tr}(\Sigma_2^{-1}\Sigma_1) - D + (\mu_2 -\mu_1)\Sigma_2^{-1}(\mu_2 -\mu_1) - \log\frac{\mathrm{det}\Sigma_1}{\mathrm{det}\Sigma_2}\right]$$
 
-where $D$ is the dimension of $x to arrive at
+where $D$ is the dimension of $x$ to arrive at
 
-$$ L_t = \frac{1}{2}\left[\tilde{\beta}_t\mathrm{Tr}\Sigma^{-1}_\theta(x_t, t) - D + (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0))^T\Sigma_\theta^{-1}(x_t, t) (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0)) + D\log\tilde\beta_t - \log\det\Sigma_{\theta}(x_t, t)\right]. $$
+$$ L_t = \frac{1}{2}\left[\tilde{\beta}_t\mathrm{Tr}\Sigma^{-1}_\theta(x_t, t) - D + (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0))^T\Sigma_\theta^{-1}(x_t, t) (\mu_{\theta}(x_t, t)-\tilde\mu(x_t, x_0)) - D\log\tilde\beta_t + \log\det\Sigma_{\theta}(x_t, t)\right]. $$
 
 Since the covariance matrix of the forward transition is diagonal, it is reasonable to postulate $\Sigma_\theta(x_t, t) = diag(\Sigma_{\theta}^{ii}(x_t, t))$, which simplifies the formula to a sum of one dimensional KL-divergences
 
-$$ L_t = \frac{1}{2}\mathbb{E}_{x_0, x_t \sim q}\sum_i\left[ \frac{\tilde{\beta}_t + (\mu_{\theta}^i(x_t, t)-\tilde\mu^i(x_t, x_0))^2}{\Sigma_{\theta}^{ii}(x_t, t)} - \sum_i\log\Sigma_{\theta}^{ii}(x_t, t) - 1\right] + \frac{D(\log\tilde\beta_t -1)}{2}$$
+$$ L_t = \frac{1}{2}\mathbb{E}_{x_0, x_t \sim q}\sum_i\left[ \frac{\tilde{\beta}_t + (\mu_{\theta}^i(x_t, t)-\tilde\mu^i(x_t, x_0))^2}{\Sigma_{\theta}^{ii}(x_t, t)} - \sum_i\log\Sigma_{\theta}^{ii}(x_t, t) - 1\right] - \frac{D(\log\tilde\beta_t -1)}{2}$$
 
 This is where [Sohl-Dickstein et al (2015)](https://arxiv.org/pdf/1503.03585) effectively puts down the pen. They set $(\mu_{\theta}(x_t, t), \Sigma_{\theta}(x_t, t))$ to be the output of a Neural Network (see below for architectures) and learn them together with $\beta_t$ by gradient descent. On the other hand, [Ho et al (2020)](https://arxiv.org/pdf/2006.11239) set $\Sigma^{ii}_{\theta}(x_t, t)$ to be a constant $\sigma_t^2$ and treat the $\beta_t$-s (and thus the $\tilde \beta_t$-s) as hyperparameters. After dropping the now non-trainable terms, this approach ends up with 
 
@@ -574,6 +574,8 @@ and the diffusion model objective for each $t$ is simply a rescaled version of t
 
 ### Deeper connection with Diffusions: Discretization of SDE noising schemes
 
+#### **Limiting SDE for NCSN**
+
 [Song et al. (2021)](https://openreview.net/pdf?id=PxTIG12RRHS) showed that both DDPM and NCSN are discretizations of a corresponding Stochastic Differential Equation (SDE). Starting with the NCSN, note that the data perturbation of the noise level $i$, $q_{\sigma_i}(x_i | x_0)$ is the marginal distribution of a Markov chain
 
 $$ x_i = x_{i-1} + \sqrt{\sigma_i^2-\sigma_{i-1}^2}z_{i-1}, \qquad z_{i-1}\sim\mathcal{N}(0, I), \qquad t = 1,\dots, N $$
@@ -584,24 +586,61 @@ $$x(t+\Delta t) = x(t) + \sqrt{\sigma^2(t+\Delta t)-\sigma^2(t)}z(t),$$
 
 where we also introduced $z(t) = z(i/N)$ and $\Delta t = 1/N$. Thus, the process $x(t)$ converges in distribution to the solution of the SDE
 
-$$ dx = \sqrt{\frac{d[\sigma^2(t)]}{dt}}dw.$$
+$$ dx = \sqrt{\frac{d[\sigma^2(t)]}{dt}}dw, \qquad x(0) = x_0$$
 
 The variance at time $t$ can be easily seen to be $\sigma^2(t)$ (ignoring the variance of $x_0$) using the Ito-isometry and thus this is called a variance exploding VE-SDE, since $\sigma^2(t)$ usually increases with $t$. We emphasize however that there is no finite time blow-up.
 
+The solution of this SDE is the stochastic integral
 
+$$ x(t) = x(0) + \int_0^t\sqrt{\frac{d[\sigma^2(s)]}{ds}}dw(s) $$
 
+which is a Gaussian Markov process with transition function $q(x(t)|x(s)) = \mathcal{N}(x(t); x(s), \sigma^2(t) -\sigma^2(s))$. As an analog of the geometric progression of $\sigma_i$, one can use $\sigma(t) = \sigma_{min}\left(\frac{\sigma_{max}}{\sigma_{min}}\right)^t$. Note, however, that we lost the property of $\sigma_0=0$ and thus it is proposed by always solving the SDE from some very small positive time.
 
-More precisely, they both perturb the data with multiple noise scales, which can be taken to the extreme when the noising process is described by a time dependent SDE:
+#### **Limiting SDE for DDPM**
+
+Using $\bar\beta_i = N\beta_i$, the forward diffusion process can be rewritten as
+
+$$ x_i = \sqrt{1-\frac{\bar\beta_i}{N}}x_{i-1} + \sqrt{\frac{\bar\beta_i}{N}}\epsilon_{i-1},\qquad i = 1,\dots, N $$
+
+Introducing continuous time processes and functions by
+
+$$ x(i/N) = x_i, \qquad z(i/N) = z_i, \qquad \beta(i/N) = \bar\beta_i, $$
+
+we can rewrite the Markov chain as
+
+$$ x(t+\Delta t) = \sqrt{1-\beta(t+\Delta t)\Delta t} x(t) + \sqrt{\beta(t+\Delta t)\Delta t}z(t) $$
+
+which shows that as $N\to\infty$, the process $x(t)$ converges in distribution to the time dependent Ohrstein-Uhlenbeck process which is the solution of the SDE:
+
+$$ dx(t) = -\frac{1}{2}\beta(t)x(t) dt + \sqrt{\beta(t)}dw, \qquad x(0) = x_0 $$
+
+The solution is
+
+$$ x(t) = e^{-\frac{1}{2}\int_0^t\beta(s)ds}x_0 + \int_0^te^{-\frac{1}{2}\int_s^t\beta(s')ds'}\sqrt{\beta(s)}dW(s) $$
+
+This is again a Gaussian Markov process with mean $\mathrm{E}[x(t)|x_0] = e^{-\frac{1}{2}\int_0^t\beta(s)ds}x_0$ and variance is 
+
+$$ \mathrm{Var}(x(t)) = e^{-\int_0^t\beta(s)ds}\mathrm{Var}(x_0) + (1-e^{-\int_0^t\beta(s)ds}) I. $$
+
+Note that this (pixel-wise) variance converges to one as long as $\int_0^t\beta(s)ds\to \infty$. Moreover, if the variance of $x_0$ is unit, then this is preserved all throughout the process, and this SDE is called the variance preserving VP-SDE.
+
+#### **SDE noising schemes**
+
+We established above that both DDPM-s and NCSN-s have an associated limiting SDE. This suggests that they are two special cases of a more general family of noising schemes where the forward process is a time dependent SDE ([Song et al. (2021)](https://openreview.net/pdf?id=PxTIG12RRHS) consider a general diffusion coefficient $G(x,t)$ as well):
 
 $$
-dx = f(x, t)dt + g(t)dW(t),\qquad x(0) = x_0
+dx = f(x, t)dt + g(t)dW(t),\qquad x(0) = x_0.
 $$
 
-where we would like the distribution of $x_T$, denoted by $p_T(x)$ to be an unstructure prior, most notably an isotropic Gaussian. Not every SDE will acheive this but a large class of them do. The remarkable fact is that the reverse of such a process is also described by an SDE that goes backwards in time and contains the score function of the forward SDE solution:
+We would like the distribution of $x_T$, denoted by $p_T(x)$ to be an unstructure prior, most notably an isotropic (not necessarily standard) Gaussian. Not every SDE will acheive this but a large class of them do.
+
+The remarkable fact is ([Anderson, 1979](https://core.ac.uk/download/pdf/82826666.pdf)) that the reverse of such a process is also described by an SDE that goes backwards in time and contains the score function of the forward SDE solution:
 
 $$
-dx = \left[f(x,t) - g^2(t)\nabla_x\log p_t(x)\right]dt + g(t)d\hat{W}
+dx(t) = \left[f(x,t) - g^2(t)\nabla_x\log p_t(x(t))\right]dt + g(t)d\hat w(t),
 $$
+
+where $\hat w(t)$ is a backwards Brownian motion. This means that if we can estimate the score function
 
 [TODO]
 
